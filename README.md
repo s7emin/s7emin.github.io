@@ -1,1 +1,1 @@
-# s7emin.github.io
+<h1 align="center">CEMIN.RU</h1>
