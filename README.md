@@ -1,2 +1,1 @@
-# cemin.ru
 *Empty website*
