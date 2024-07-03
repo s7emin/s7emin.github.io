@@ -1,1 +1,1 @@
-*Empty website*
+*Sergey Semin*
