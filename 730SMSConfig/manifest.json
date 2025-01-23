@@ -1,0 +1,15 @@
+{
+  "name": "USR730 SMSConfig",
+  "short_name": "PWA",
+  "description": "Приложение для конфигурации модема USR730 через СМС",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4CAF50",
+  "icons": [
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+}
