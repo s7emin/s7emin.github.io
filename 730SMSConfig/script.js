@@ -91,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const port = portInput.value;
         const speed = speedInput.value;
 
-        const smsContent = `Пароль: ${password}, IP: ${ip}, Порт: ${port}, Скорость: ${speed}`;
+        const smsContent = `${password}#AT+SOCKA="TCP","${ip}",${port};AT+UART=${speed},"NONE",8,1,"NONE";AT+RSTIM=60000;AT+HEARTEN="off";AT+REGTP="IMEI";AT+REGEN="on";AT+S`;
         const smsLink = `smsto:${phone}?body=${encodeURIComponent(smsContent)}`;
 
         QRCode.toCanvas(document.getElementById("qrCodeCanvas"), smsLink, { width: 200 }, (error) => {
