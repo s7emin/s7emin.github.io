@@ -46,18 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Проверка скорости
-    speedInput.addEventListener('change', () => {
-        if (!validSpeeds.includes(speedInput.value)) {
-            speedInput.classList.add("error");
-            document.getElementById("speed-error").textContent = "Выберите корректную скорость";
-            document.getElementById("speed-error").style.display = "inline-block";
-        } else {
-            speedInput.classList.remove("error");
-            document.getElementById("speed-error").textContent = "";
-            document.getElementById("speed-error").style.display = "none";
-        }
-    });
 
     // Загружаем данные из локального хранилища
     const loadStoredData = () => {
@@ -94,8 +82,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const smsContent = `${password}#AT+SOCKA="TCP","${ip}",${port};AT+UART=${speed},"NONE",8,1,"NONE";AT+RSTIM=60000;AT+HEARTEN="off";AT+REGTP="IMEI";AT+REGEN="on";AT+S`;
         const smsLink = `smsto:${phone}?body=${encodeURIComponent(smsContent)}`;
 
-        QRCode.toCanvas(document.getElementById("qrCodeCanvas"), smsLink, { width: 200 }, (error) => {
-            if (error) console.error(error);
+        QRCode.toDataURL(smsLink, { width: 200 }, (error, url) => {
+            if (error) {
+                console.error(error);
+                return;
+            }
+            qrCodeImage.src = url; // Устанавливаем Data URL как источник изображения
         });
     };
 
