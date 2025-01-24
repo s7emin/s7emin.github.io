@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
     const phoneInput = document.getElementById("phone");
-    const passwordInput = document.getElementById("password");
     const ipInput = document.getElementById("ip");
     const portInput = document.getElementById("port");
     const speedInput = document.getElementById("speed");
@@ -52,7 +51,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const storedData = JSON.parse(localStorage.getItem("configData"));
         if (storedData) {
             phoneInput.value = storedData.phone || "+7";
-            passwordInput.value = storedData.password || "usr.cn";
             ipInput.value = storedData.ip || "";
             portInput.value = storedData.port || 1;
             speedInput.value = storedData.speed || "9600";
@@ -63,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const saveDataToLocalStorage = () => {
         const configData = {
             phone: phoneInput.value,
-            password: passwordInput.value,
             ip: ipInput.value,
             port: portInput.value,
             speed: speedInput.value,
@@ -74,12 +71,11 @@ document.addEventListener("DOMContentLoaded", () => {
     // Генерация QR-кода
     const generateQRCode = () => {
         const phone = phoneInput.value;
-        const password = passwordInput.value;
         const ip = ipInput.value;
         const port = portInput.value;
         const speed = speedInput.value;
 
-        const smsContent = `${password}#AT+SOCKA="TCP","${ip}",${port};AT+UART=${speed},"NONE",8,1,"NONE";AT+RSTIM=60000;AT+HEARTEN="off";AT+REGTP="IMEI";AT+REGEN="on";AT+S`;
+        const smsContent = `usr.cn#AT+IMEI;AT+SOCKA="TCP","${ip}",${port};AT+UART=${speed},"NONE",8,1,"NONE";AT+RSTIM=60000;AT+HEARTEN="off";AT+REGTP="IMEI";AT+REGEN="on";AT+S`;
         const smsLink = `smsto:${phone}?body=${encodeURIComponent(smsContent)}`;
 
         QRCode.toDataURL(smsLink, { width: 200 }, (error, url) => {
@@ -93,11 +89,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Слушатели событий для каждого поля
     phoneInput.addEventListener("input", () => {
-        saveDataToLocalStorage();
-        generateQRCode();
-    });
-
-    passwordInput.addEventListener("input", () => {
         saveDataToLocalStorage();
         generateQRCode();
     });
