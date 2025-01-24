@@ -113,7 +113,9 @@ input.error, select.error {
         </form>
 
         <div id="qrCodeContainer">
-            <img id="qrCodeImage" alt="QR Code" />
+            <a id="qrCodeLink" href="#">
+            <img id="qrCodeImage" alt="QR Code"/>
+        </a>
         </div>
     </div>
 
@@ -205,6 +207,8 @@ input.error, select.error {
                 return;
             }
             qrCodeImage.src = url; // Устанавливаем Data URL как источник изображения
+			qrCodeLink.href = smsLink; // Устанавливаем ссылку
+
         });
     };
 
