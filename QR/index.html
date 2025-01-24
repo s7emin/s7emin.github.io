@@ -200,7 +200,7 @@ input.error, select.error {
 
         const smsContent = `usr.cn#AT+IMEI;AT+SOCKA="TCP","${ip}",${port};AT+UART=${speed},"NONE",8,1,"NONE";AT+RSTIM=60000;AT+HEARTEN="off";AT+REGTP="IMEI";AT+REGEN="on";AT+S`;
         const smsQR = `smsto:${phone}?body=${encodeURIComponent(smsContent)}`;
-		const smsLink = `sms://${phone}?body=${encodeURIComponent(smsContent)}`;
+		const smsLink = `sms:${phone}?body=${encodeURIComponent(smsContent)}`;
 
         QRCode.toDataURL(smsQR, { width: 250 }, (error, url) => {
             if (error) {
