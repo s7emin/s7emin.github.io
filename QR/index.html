@@ -199,9 +199,10 @@ input.error, select.error {
         const speed = speedInput.value;
 
         const smsContent = `usr.cn#AT+IMEI;AT+SOCKA="TCP","${ip}",${port};AT+UART=${speed},"NONE",8,1,"NONE";AT+RSTIM=60000;AT+HEARTEN="off";AT+REGTP="IMEI";AT+REGEN="on";AT+S`;
-        const smsLink = `smsto:${phone}?body=${encodeURIComponent(smsContent)}`;
+        const smsQR = `smsto:${phone}?body=${encodeURIComponent(smsContent)}`;
+		const smsLink = `sms:${phone}?body=${encodeURIComponent(smsContent)}`;
 
-        QRCode.toDataURL(smsLink, { width: 250 }, (error, url) => {
+        QRCode.toDataURL(smsQR, { width: 250 }, (error, url) => {
             if (error) {
                 console.error(error);
                 return;
