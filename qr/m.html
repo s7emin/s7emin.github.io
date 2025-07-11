@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Сканер QR-кодов</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Авто-сканер QR</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body {
@@ -26,30 +26,51 @@
   </style>
 </head>
 <body>
-
   <h1>Сканер QR-кодов</h1>
   <div id="reader"></div>
   <div id="result">Ожидание сканирования...</div>
 
   <script>
-    function onScanSuccess(decodedText, decodedResult) {
-      // Останавливаем сканер после успешного сканирования
-      html5QrcodeScanner.clear().then(_ => {
-        document.getElementById("result").innerText = "Результат: " + decodedText;
-      }).catch(error => {
-        console.error('Ошибка при остановке сканера: ', error);
-      });
+    const reader = new Html5Qrcode("reader");
+    let triedFallback = false;
+
+    async function startScanner() {
+      const config = {
+        fps: 10,
+        qrbox: 250
+      };
+
+      const constraints = triedFallback
+        ? { facingMode: "environment" } // fallback
+        : { facingMode: { exact: "environment" } }; // предпочтительно для iOS 16+
+
+      try {
+        await reader.start(
+          constraints,
+          config,
+          (decodedText, decodedResult) => {
+            document.getElementById("result").innerText = "Результат: " + decodedText;
+            reader.stop();
+          },
+          (errorMessage) => {
+            // Можно скрыть или логировать ошибки чтения
+          }
+        );
+      } catch (err) {
+        if (!triedFallback) {
+          triedFallback = true;
+          startScanner(); // пробуем ещё раз с другим facingMode
+        } else {
+          document.getElementById("result").innerText =
+            "Не удалось получить доступ к задней камере.\n" + err;
+          console.error("Ошибка доступа к камере:", err);
+        }
+      }
     }
 
-    // Создание и запуск сканера
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-      "reader", 
-      { fps: 10, qrbox: 250 }, 
-      false
-    );
-
-    html5QrcodeScanner.render(onScanSuccess);
+    window.addEventListener("load", () => {
+      startScanner();
+    });
   </script>
-
 </body>
 </html>
