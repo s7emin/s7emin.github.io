@@ -1,119 +1,32 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QR Сканер + API</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-    #reader {
-      width: 100%;
-      max-width: 400px;
-      margin: 20px auto;
-    }
-    #result, #num {
-      font-size: 1.1em;
-      margin-top: 20px;
-      color: green;
-      word-break: break-word;
-    }
-    #num {
-      font-weight: bold;
-      color: darkblue;
-    }
-  </style>
-</head>
-<body>
-  <h1>Сканирование QR + Загрузка данных</h1>
-  <div id="reader"></div>
-  <div id="result">Ожидание сканирования...</div>
-  <div id="num"></div>
+async function handleQrCode(qrUrl) {
+  document.getElementById("result").innerText = "QR-код: " + qrUrl;
+  const id = extractIdFromUrl(qrUrl);
 
-  <script>
-    const reader = new Html5Qrcode("reader");
-    let triedFallback = false;
+  if (!id) {
+    document.getElementById("num").innerText = "❌ Неверный QR-код — ID не найден в URL";
+    return;
+  }
 
-    async function startScanner() {
-      const config = {
-        fps: 10,
-        qrbox: 250
-      };
+  const apiUrl = `https://fgis.gost.ru/fundmetrology/eapi/vri/${id}`;
+  document.getElementById("num").innerText = "🔄 Загружаю: " + apiUrl;
 
-      const constraints = triedFallback
-        ? { facingMode: "environment" }
-        : { facingMode: { exact: "environment" } };
+  try {
+    const response = await fetch(apiUrl);
 
-      try {
-        await reader.start(
-          constraints,
-          config,
-          (decodedText, decodedResult) => {
-            reader.stop();
-            handleQrCode(decodedText);
-          },
-          (errorMessage) => {
-            // Промахи сканирования
-          }
-        );
-      } catch (err) {
-        if (!triedFallback) {
-          triedFallback = true;
-          startScanner();
-        } else {
-          document.getElementById("result").innerText =
-            "Ошибка доступа к камере: " + err;
-        }
-      }
+    if (!response.ok) {
+      document.getElementById("num").innerText += `\n❌ HTTP статус: ${response.status}`;
+      throw new Error("Сервер ответил ошибкой");
     }
 
-    function extractIdFromUrl(url) {
-      const match = url.match(/\/results\/(.+)$/);
-      return match ? match[1] : null;
+    const data = await response.json();
+    const manufactureNum = data?.result?.miInfo?.singleMI?.manufactureNum;
+
+    if (manufactureNum) {
+      document.getElementById("num").innerText += `\n✅ Зав. номер(а): ${manufactureNum}`;
+    } else {
+      document.getElementById("num").innerText += `\n⚠️ Значение manufactureNum не найдено`;
     }
-
-    async function handleQrCode(qrUrl) {
-      document.getElementById("result").innerText = "QR-код: " + qrUrl;
-      const id = extractIdFromUrl(qrUrl);
-
-      if (!id) {
-        document.getElementById("num").innerText = "Неверный QR-код — ID не найден";
-        return;
-      }
-
-      const apiUrl = `https://fgis.gost.ru/fundmetrology/eapi/vri/${id}`;
-
-      try {
-        const response = await fetch(apiUrl);
-        if (!response.ok) {
-          throw new Error("Ошибка загрузки данных с сервера");
-        }
-
-        const data = await response.json();
-        const manufactureNum = data?.result?.miInfo?.singleMI?.manufactureNum;
-
-        if (manufactureNum) {
-          document.getElementById("num").innerText = "Зав. номер(а): " + manufactureNum;
-
-          // Здесь в будущем можно сделать поиск среди другого API по этим номерам
-          // Например: searchAnotherApi(manufactureNum);
-        } else {
-          document.getElementById("num").innerText = "Значение manufactureNum не найдено в ответе.";
-        }
-      } catch (error) {
-        console.error("Ошибка при запросе API:", error);
-        document.getElementById("num").innerText = "Ошибка загрузки данных: " + error.message;
-      }
-    }
-
-    window.addEventListener("load", () => {
-      startScanner();
-    });
-  </script>
-</body>
-</html>
+  } catch (error) {
+    document.getElementById("num").innerText += `\n❌ Ошибка: ${error.message}`;
+  }
+}
