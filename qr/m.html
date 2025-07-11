@@ -270,6 +270,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
     <script>
         class QRScanner {
             constructor() {
@@ -335,9 +336,9 @@
                         this.stopBtn.style.display = 'inline-block';
                         this.scanBtn.style.display = 'inline-block';
                         
-                        this.showStatus('Камера запущена. Наведите на QR-код и нажмите "Сканировать QR"', 'success');
+                        this.showStatus('Камера запущена. Наведите на QR-код. Сканирование происходит автоматически каждую секунду', 'success');
                         
-                        // Автоматическое сканирование каждые 2 секунды
+                        // Автоматическое сканирование каждые 1 секунду
                         this.startAutoScan();
                     });
                     
@@ -371,7 +372,7 @@
                     if (this.scanning) {
                         this.scanQR();
                     }
-                }, 2000);
+                }, 1000); // Сканирование каждую секунду
             }
             
             stopAutoScan() {
@@ -389,7 +390,23 @@
                 // Захват кадра с видео
                 this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
                 
-                // Попытка распознать QR-код с помощью встроенного API
+                // Получение данных изображения для jsQR
+                const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Использование jsQR для распознавания QR-кода
+                if (typeof jsQR !== 'undefined') {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+                    
+                    if (code) {
+                        console.log('QR-код найден с jsQR:', code.data);
+                        this.onQRDetected(code.data);
+                        return;
+                    }
+                }
+                
+                // Fallback к встроенному API
                 if ('BarcodeDetector' in window) {
                     const barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
                     
@@ -397,25 +414,16 @@
                         .then(barcodes => {
                             if (barcodes.length > 0) {
                                 const qrData = barcodes[0].rawValue;
+                                console.log('QR-код найден с BarcodeDetector:', qrData);
                                 this.onQRDetected(qrData);
                             }
                         })
                         .catch(err => {
-                            console.log('Ошибка распознавания:', err);
+                            console.log('Ошибка BarcodeDetector:', err);
                         });
                 } else {
-                    // Fallback для браузеров без BarcodeDetector
-                    this.tryManualDetection();
+                    console.log('BarcodeDetector не поддерживается');
                 }
-            }
-            
-            tryManualDetection() {
-                // Простая попытка найти QR-код через анализ изображения
-                const imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-                
-                // Здесь можно добавить простой алгоритм поиска QR-кода
-                // Для упрощения просто показываем статус
-                console.log('Попытка ручного распознавания...');
             }
             
             onQRDetected(qrData) {
