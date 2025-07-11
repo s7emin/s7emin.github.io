@@ -1,32 +1,125 @@
-async function handleQrCode(qrUrl) {
-  document.getElementById("result").innerText = "QR-код: " + qrUrl;
-  const id = extractIdFromUrl(qrUrl);
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR + API</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 10px;
+      text-align: center;
+    }
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    #log {
+      margin-top: 15px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: left;
+      font-size: 0.95em;
+      white-space: pre-wrap;
+      background: #f9f9f9;
+    }
+    h1 {
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
 
-  if (!id) {
-    document.getElementById("num").innerText = "❌ Неверный QR-код — ID не найден в URL";
-    return;
-  }
+  <h1>Сканер QR + API (iOS/Android)</h1>
+  <div id="reader"></div>
+  <div id="log">⏳ Ожидание сканирования...</div>
 
-  const apiUrl = `https://fgis.gost.ru/fundmetrology/eapi/vri/${id}`;
-  document.getElementById("num").innerText = "🔄 Загружаю: " + apiUrl;
+  <script>
+    const logEl = document.getElementById("log");
 
-  try {
-    const response = await fetch(apiUrl);
-
-    if (!response.ok) {
-      document.getElementById("num").innerText += `\n❌ HTTP статус: ${response.status}`;
-      throw new Error("Сервер ответил ошибкой");
+    function log(msg) {
+      logEl.innerText += "\n" + msg;
     }
 
-    const data = await response.json();
-    const manufactureNum = data?.result?.miInfo?.singleMI?.manufactureNum;
-
-    if (manufactureNum) {
-      document.getElementById("num").innerText += `\n✅ Зав. номер(а): ${manufactureNum}`;
-    } else {
-      document.getElementById("num").innerText += `\n⚠️ Значение manufactureNum не найдено`;
+    function clearLog() {
+      logEl.innerText = "";
     }
-  } catch (error) {
-    document.getElementById("num").innerText += `\n❌ Ошибка: ${error.message}`;
-  }
-}
+
+    const html5QrCode = new Html5Qrcode("reader");
+
+    async function startScanner() {
+      clearLog();
+      log("📷 Запуск сканирования...");
+
+      const config = {
+        fps: 10,
+        qrbox: 250
+      };
+
+      const constraints = {
+        facingMode: { exact: "environment" }
+      };
+
+      try {
+        await html5QrCode.start(
+          constraints,
+          config,
+          qrCodeSuccessCallback,
+          qrCodeErrorCallback
+        );
+        log("✅ Камера запущена");
+      } catch (err) {
+        log("❌ Ошибка запуска камеры: " + err);
+      }
+    }
+
+    function qrCodeErrorCallback(errorMessage) {
+      // Можно игнорировать — это не ошибка, а неудачная попытка сканирования
+    }
+
+    async function qrCodeSuccessCallback(decodedText, decodedResult) {
+      html5QrCode.stop(); // остановить после первого успешного считывания
+      log("📦 QR-код: " + decodedText);
+
+      const idMatch = decodedText.match(/\/results\/(.+)$/);
+      if (!idMatch) {
+        log("❌ Неверный формат QR. Не найден ID после /results/");
+        return;
+      }
+
+      const id = idMatch[1];
+      const apiUrl = `https://fgis.gost.ru/fundmetrology/eapi/vri/${id}`;
+      log("🌐 Получаю: " + apiUrl);
+
+      try {
+        const response = await fetch(apiUrl);
+        log("🔁 HTTP статус: " + response.status);
+
+        if (!response.ok) {
+          log("❌ Сервер вернул ошибку");
+          return;
+        }
+
+        const json = await response.json();
+        const manufactureNum = json?.result?.miInfo?.singleMI?.manufactureNum;
+
+        if (manufactureNum) {
+          log("✅ Заводской номер: " + manufactureNum);
+        } else {
+          log("⚠️ manufactureNum не найден в ответе");
+        }
+      } catch (err) {
+        log("❌ Ошибка fetch: " + err.message);
+      }
+    }
+
+    window.addEventListener("load", () => {
+      startScanner();
+    });
+  </script>
+
+</body>
+</html>
