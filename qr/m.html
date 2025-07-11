@@ -1,125 +1,88 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>QR + API</title>
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <meta charset="UTF-8" />
+  <title>QR сканер поверки</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
       font-family: sans-serif;
       margin: 0;
-      padding: 10px;
-      text-align: center;
-    }
-    #reader {
-      width: 100%;
-      max-width: 400px;
-      margin: 20px auto;
-    }
-    #log {
-      margin-top: 15px;
-      padding: 10px;
-      border: 1px solid #ccc;
-      text-align: left;
-      font-size: 0.95em;
-      white-space: pre-wrap;
+      padding: 1rem;
       background: #f9f9f9;
     }
-    h1 {
-      font-size: 1.2em;
+    video {
+      width: 100%;
+      max-height: 300px;
+      border: 1px solid #ccc;
+      margin-top: 1rem;
+    }
+    #result {
+      margin-top: 1rem;
+      background: #e0ffe0;
+      padding: 1rem;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
 
-  <h1>Сканер QR + API (iOS/Android)</h1>
-  <div id="reader"></div>
-  <div id="log">⏳ Ожидание сканирования...</div>
+<h1>📷 Сканер поверки</h1>
+<p>Наведи камеру на QR-код...</p>
+<video id="video" playsinline></video>
+<div id="result">Результат появится здесь</div>
 
-  <script>
-    const logEl = document.getElementById("log");
+<script type="module">
+  import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
 
-    function log(msg) {
-      logEl.innerText += "\n" + msg;
+  const videoElem = document.getElementById("video");
+  const resultElem = document.getElementById("result");
+
+  const scanner = new QrScanner(videoElem, result => {
+    handleQRCode(result);
+  }, {
+    preferredCamera: 'environment',
+    highlightScanRegion: true,
+    highlightCodeOutline: true
+  });
+
+  async function startScanner() {
+    try {
+      await QrScanner.hasCamera();
+      await scanner.start();
+    } catch (e) {
+      resultElem.innerText = "❌ Не удалось получить доступ к камере: " + e.message;
+    }
+  }
+
+  async function handleQRCode(text) {
+    scanner.stop();
+    resultElem.innerText = `🔗 QR: ${text}`;
+
+    const match = text.match(/results\/(.+)$/);
+    if (!match) {
+      resultElem.innerText += `\n⚠️ Неверный формат QR-кода`;
+      return;
     }
 
-    function clearLog() {
-      logEl.innerText = "";
+    const id = match[1];
+    const apiUrl = `https://fgis.gost.ru/fundmetrology/cm/iaux/vri/${id}`;
+
+    try {
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error("Ошибка API: " + response.status);
+      const data = await response.json();
+
+      const manufactureNum = data?.result?.miInfo?.singleMI?.manufactureNum;
+
+      resultElem.innerText += `\n🏷️ Заводской номер: ${manufactureNum ?? "не найдено"}`;
+    } catch (e) {
+      resultElem.innerText += `\n❌ Ошибка запроса: ${e.message}`;
     }
+  }
 
-    const html5QrCode = new Html5Qrcode("reader");
-
-    async function startScanner() {
-      clearLog();
-      log("📷 Запуск сканирования...");
-
-      const config = {
-        fps: 10,
-        qrbox: 250
-      };
-
-      const constraints = {
-        facingMode: { exact: "environment" }
-      };
-
-      try {
-        await html5QrCode.start(
-          constraints,
-          config,
-          qrCodeSuccessCallback,
-          qrCodeErrorCallback
-        );
-        log("✅ Камера запущена");
-      } catch (err) {
-        log("❌ Ошибка запуска камеры: " + err);
-      }
-    }
-
-    function qrCodeErrorCallback(errorMessage) {
-      // Можно игнорировать — это не ошибка, а неудачная попытка сканирования
-    }
-
-    async function qrCodeSuccessCallback(decodedText, decodedResult) {
-      html5QrCode.stop(); // остановить после первого успешного считывания
-      log("📦 QR-код: " + decodedText);
-
-      const idMatch = decodedText.match(/\/results\/(.+)$/);
-      if (!idMatch) {
-        log("❌ Неверный формат QR. Не найден ID после /results/");
-        return;
-      }
-
-      const id = idMatch[1];
-      const apiUrl = `https://fgis.gost.ru/fundmetrology/cm/iaux/vri/${id}`;
-      log("🌐 Получаю: " + apiUrl);
-
-      try {
-        const response = await fetch(apiUrl);
-        log("🔁 HTTP статус: " + response.status);
-
-        if (!response.ok) {
-          log("❌ Сервер вернул ошибку");
-          return;
-        }
-
-        const json = await response.json();
-        const manufactureNum = json?.result?.miInfo?.singleMI?.manufactureNum;
-
-        if (manufactureNum) {
-          log("✅ Заводской номер: " + manufactureNum);
-        } else {
-          log("⚠️ manufactureNum не найден в ответе");
-        }
-      } catch (err) {
-        log("❌ Ошибка fetch: " + err.message);
-      }
-    }
-
-    window.addEventListener("load", () => {
-      startScanner();
-    });
-  </script>
+  startScanner();
+</script>
 
 </body>
 </html>
