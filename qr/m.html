@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Авто-сканер QR</title>
+  <title>QR Сканер + API</title>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <style>
     body {
@@ -17,18 +17,23 @@
       max-width: 400px;
       margin: 20px auto;
     }
-    #result {
-      font-size: 1.2em;
+    #result, #num {
+      font-size: 1.1em;
       margin-top: 20px;
       color: green;
       word-break: break-word;
     }
+    #num {
+      font-weight: bold;
+      color: darkblue;
+    }
   </style>
 </head>
 <body>
-  <h1>Сканер QR-кодов</h1>
+  <h1>Сканирование QR + Загрузка данных</h1>
   <div id="reader"></div>
   <div id="result">Ожидание сканирования...</div>
+  <div id="num"></div>
 
   <script>
     const reader = new Html5Qrcode("reader");
@@ -41,30 +46,68 @@
       };
 
       const constraints = triedFallback
-        ? { facingMode: "environment" } // fallback
-        : { facingMode: { exact: "environment" } }; // предпочтительно для iOS 16+
+        ? { facingMode: "environment" }
+        : { facingMode: { exact: "environment" } };
 
       try {
         await reader.start(
           constraints,
           config,
           (decodedText, decodedResult) => {
-            document.getElementById("result").innerText = "Результат: " + decodedText;
             reader.stop();
+            handleQrCode(decodedText);
           },
           (errorMessage) => {
-            // Можно скрыть или логировать ошибки чтения
+            // Промахи сканирования
           }
         );
       } catch (err) {
         if (!triedFallback) {
           triedFallback = true;
-          startScanner(); // пробуем ещё раз с другим facingMode
+          startScanner();
         } else {
           document.getElementById("result").innerText =
-            "Не удалось получить доступ к задней камере.\n" + err;
-          console.error("Ошибка доступа к камере:", err);
+            "Ошибка доступа к камере: " + err;
         }
+      }
+    }
+
+    function extractIdFromUrl(url) {
+      const match = url.match(/\/results\/(.+)$/);
+      return match ? match[1] : null;
+    }
+
+    async function handleQrCode(qrUrl) {
+      document.getElementById("result").innerText = "QR-код: " + qrUrl;
+      const id = extractIdFromUrl(qrUrl);
+
+      if (!id) {
+        document.getElementById("num").innerText = "Неверный QR-код — ID не найден";
+        return;
+      }
+
+      const apiUrl = `https://fgis.gost.ru/fundmetrology/eapi/vri/${id}`;
+
+      try {
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error("Ошибка загрузки данных с сервера");
+        }
+
+        const data = await response.json();
+        const manufactureNum = data?.result?.miInfo?.singleMI?.manufactureNum;
+
+        if (manufactureNum) {
+          document.getElementById("num").innerText = "Зав. номер(а): " + manufactureNum;
+
+          // Здесь в будущем можно сделать поиск среди другого API по этим номерам
+          // Например: searchAnotherApi(manufactureNum);
+        } else {
+          document.getElementById("num").innerText = "Значение manufactureNum не найдено в ответе.";
+        }
+      } catch (error) {
+        console.error("Ошибка при запросе API:", error);
+        document.getElementById("num").innerText = "Ошибка загрузки данных: " + error.message;
       }
     }
 
