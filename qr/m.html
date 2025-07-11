@@ -1,88 +1,610 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>QR сканер поверки</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 0;
-      padding: 1rem;
-      background: #f9f9f9;
-    }
-    video {
-      width: 100%;
-      max-height: 300px;
-      border: 1px solid #ccc;
-      margin-top: 1rem;
-    }
-    #result {
-      margin-top: 1rem;
-      background: #e0ffe0;
-      padding: 1rem;
-      border: 1px solid #ccc;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Сканер - ФГИС</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .scanner-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .scanner-area {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        #video {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+        }
+        
+        .scan-button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin: 10px;
+        }
+        
+        .scan-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        
+        .scan-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .result-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result-header {
+            text-align: center;
+            margin-bottom: 25px;
+            color: #333;
+        }
+        
+        .result-header h2 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .data-section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .data-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .data-row {
+            margin-bottom: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .data-row:last-child {
+            border-bottom: none;
+        }
+        
+        .data-label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        
+        .data-value {
+            color: #333;
+            word-wrap: break-word;
+        }
+        
+        .url-link {
+            color: #667eea;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        
+        .url-link:hover {
+            text-decoration: underline;
+        }
+        
+        .raw-data {
+            background: #f1f3f4;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            border: 1px solid #ddd;
+        }
+        
+        .toggle-raw {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .scanner-container, .result-container {
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            
+            .scan-button {
+                padding: 12px 24px;
+                font-size: 1em;
+            }
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 QR Сканер</h1>
+            <p>Сканирование QR-кодов для получения данных ФГИС</p>
+        </div>
+        
+        <div class="scanner-container">
+            <div class="scanner-area">
+                <video id="video" autoplay muted playsinline></video>
+                <div id="scanner-placeholder">
+                    <h3>Готов к сканированию</h3>
+                    <p>Нажмите кнопку ниже для начала сканирования QR-кода</p>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <button id="startScan" class="scan-button">🔍 Начать сканирование</button>
+                <button id="stopScan" class="scan-button" style="display: none;">⏹️ Остановить</button>
+            </div>
+            
+            <div id="status" class="status" style="display: none;"></div>
+        </div>
+        
+        <div id="result" class="result-container">
+            <div class="result-header">
+                <h2>📋 Результаты</h2>
+                <p>Данные получены из ФГИС</p>
+            </div>
+            
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Загрузка данных...</p>
+            </div>
+            
+            <div id="data-content"></div>
+            
+            <button id="toggleRaw" class="toggle-raw" style="display: none;">Показать JSON</button>
+            <div id="rawData" class="raw-data" style="display: none;"></div>
+        </div>
+    </div>
 
-<h1>📷 Сканер поверки</h1>
-<p>Наведи камеру на QR-код...</p>
-<video id="video" playsinline></video>
-<div id="result">Результат появится здесь</div>
-
-<script type="module">
-  import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
-
-  const videoElem = document.getElementById("video");
-  const resultElem = document.getElementById("result");
-
-  const scanner = new QrScanner(videoElem, result => {
-    handleQRCode(result);
-  }, {
-    preferredCamera: 'environment',
-    highlightScanRegion: true,
-    highlightCodeOutline: true
-  });
-
-  async function startScanner() {
-    try {
-      await QrScanner.hasCamera();
-      await scanner.start();
-    } catch (e) {
-      resultElem.innerText = "❌ Не удалось получить доступ к камере: " + e.message;
-    }
-  }
-
-  async function handleQRCode(text) {
-    scanner.stop();
-    resultElem.innerText = `🔗 QR: ${text}`;
-
-    const match = text.match(/results\/(.+)$/);
-    if (!match) {
-      resultElem.innerText += `\n⚠️ Неверный формат QR-кода`;
-      return;
-    }
-
-    const id = match[1];
-    const apiUrl = `https://fgis.gost.ru/fundmetrology/cm/iaux/vri/${id}`;
-
-    try {
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error("Ошибка API: " + response.status);
-      const data = await response.json();
-
-      const manufactureNum = data?.result?.miInfo?.singleMI?.manufactureNum;
-
-      resultElem.innerText += `\n🏷️ Заводской номер: ${manufactureNum ?? "не найдено"}`;
-    } catch (e) {
-      resultElem.innerText += `\n❌ Ошибка запроса: ${e.message}`;
-    }
-  }
-
-  startScanner();
-</script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.min.js"></script>
+    <script>
+        class QRCodeScanner {
+            constructor() {
+                this.scanner = null;
+                this.isScanning = false;
+                this.initializeElements();
+                this.setupEventListeners();
+            }
+            
+            initializeElements() {
+                this.video = document.getElementById('video');
+                this.startBtn = document.getElementById('startScan');
+                this.stopBtn = document.getElementById('stopScan');
+                this.status = document.getElementById('status');
+                this.result = document.getElementById('result');
+                this.loading = document.getElementById('loading');
+                this.dataContent = document.getElementById('data-content');
+                this.rawData = document.getElementById('rawData');
+                this.toggleRaw = document.getElementById('toggleRaw');
+                this.placeholder = document.getElementById('scanner-placeholder');
+            }
+            
+            setupEventListeners() {
+                this.startBtn.addEventListener('click', () => this.startScanning());
+                this.stopBtn.addEventListener('click', () => this.stopScanning());
+                this.toggleRaw.addEventListener('click', () => this.toggleRawData());
+            }
+            
+            showStatus(message, type = 'info') {
+                this.status.textContent = message;
+                this.status.className = `status ${type}`;
+                this.status.style.display = 'block';
+                
+                if (type === 'success') {
+                    setTimeout(() => {
+                        this.status.style.display = 'none';
+                    }, 3000);
+                }
+            }
+            
+            async startScanning() {
+                try {
+                    this.showStatus('Инициализация камеры...', 'info');
+                    
+                    // Проверка поддержки getUserMedia
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error('Camera API not supported');
+                    }
+                    
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { 
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+                    
+                    this.video.srcObject = stream;
+                    this.video.style.display = 'block';
+                    this.placeholder.style.display = 'none';
+                    
+                    // Инициализация QR сканера
+                    this.scanner = new QrScanner(this.video, 
+                        (result) => this.onScanSuccess(result),
+                        {
+                            returnDetailedScanResult: true,
+                            highlightScanRegion: true,
+                            highlightCodeOutline: true,
+                        }
+                    );
+                    
+                    await this.scanner.start();
+                    this.isScanning = true;
+                    
+                    this.startBtn.style.display = 'none';
+                    this.stopBtn.style.display = 'inline-block';
+                    this.showStatus('Сканирование активно. Наведите камеру на QR-код', 'success');
+                    
+                } catch (error) {
+                    console.error('Ошибка запуска сканера:', error);
+                    this.showStatus('Ошибка доступа к камере. Проверьте разрешения.', 'error');
+                }
+            }
+            
+            stopScanning() {
+                if (this.scanner) {
+                    this.scanner.stop();
+                    this.scanner.destroy();
+                    this.scanner = null;
+                }
+                
+                if (this.video.srcObject) {
+                    this.video.srcObject.getTracks().forEach(track => track.stop());
+                }
+                
+                this.video.style.display = 'none';
+                this.placeholder.style.display = 'block';
+                this.isScanning = false;
+                
+                this.startBtn.style.display = 'inline-block';
+                this.stopBtn.style.display = 'none';
+                this.showStatus('Сканирование остановлено', 'info');
+            }
+            
+            async onScanSuccess(result) {
+                const qrData = result.data;
+                console.log('QR Code найден:', qrData);
+                
+                this.showStatus('QR-код найден! Обработка данных...', 'success');
+                this.stopScanning();
+                
+                // Проверка формата URL
+                const urlPattern = /https:\/\/fgis\.gost\.ru\/fundmetrology\/cm\/results\/(.+)/;
+                const match = qrData.match(urlPattern);
+                
+                if (match) {
+                    const id = match[1];
+                    const apiUrl = `https://fgis.gost.ru/fundmetrology/cm/iaux/vri/${id}`;
+                    await this.fetchData(apiUrl, qrData);
+                } else {
+                    this.showStatus('Неверный формат QR-кода. Ожидается URL вида: https://fgis.gost.ru/fundmetrology/cm/results/...', 'error');
+                }
+            }
+            
+            async fetchData(apiUrl, originalUrl) {
+                try {
+                    this.result.style.display = 'block';
+                    this.loading.style.display = 'block';
+                    this.dataContent.innerHTML = '';
+                    
+                    const response = await fetch(apiUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    this.loading.style.display = 'none';
+                    this.displayData(data, originalUrl, apiUrl);
+                    this.showStatus('Данные успешно получены!', 'success');
+                    
+                } catch (error) {
+                    this.loading.style.display = 'none';
+                    console.error('Ошибка получения данных:', error);
+                    this.showStatus(`Ошибка получения данных: ${error.message}`, 'error');
+                }
+            }
+            
+            displayData(data, originalUrl, apiUrl) {
+                let html = `
+                    <div class="data-section">
+                        <h3>🔗 URL Information</h3>
+                        <div class="data-row">
+                            <div class="data-label">Исходный URL (QR):</div>
+                            <div class="data-value"><a href="${originalUrl}" target="_blank" class="url-link">${originalUrl}</a></div>
+                        </div>
+                        <div class="data-row">
+                            <div class="data-label">API URL:</div>
+                            <div class="data-value"><a href="${apiUrl}" target="_blank" class="url-link">${apiUrl}</a></div>
+                        </div>
+                    </div>
+                `;
+                
+                if (data.result && data.result.miInfo && data.result.miInfo.singleMI) {
+                    const mi = data.result.miInfo.singleMI;
+                    html += `
+                        <div class="data-section">
+                            <h3>📊 Информация о средстве измерений</h3>
+                            <div class="data-row">
+                                <div class="data-label">Номер типа:</div>
+                                <div class="data-value">${mi.mitypeNumber || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Тип:</div>
+                                <div class="data-value">${mi.mitypeType || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Наименование:</div>
+                                <div class="data-value">${mi.mitypeTitle || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Заводской номер:</div>
+                                <div class="data-value">${mi.manufactureNum || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Модификация:</div>
+                                <div class="data-value">${mi.modification || 'N/A'}</div>
+                            </div>
+                            ${mi.mitypeURL ? `
+                            <div class="data-row">
+                                <div class="data-label">URL типа:</div>
+                                <div class="data-value"><a href="${mi.mitypeURL}" target="_blank" class="url-link">${mi.mitypeURL}</a></div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                
+                if (data.result && data.result.vriInfo) {
+                    const vri = data.result.vriInfo;
+                    html += `
+                        <div class="data-section">
+                            <h3>✅ Информация о поверке</h3>
+                            <div class="data-row">
+                                <div class="data-label">Организация:</div>
+                                <div class="data-value">${vri.organization || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Знак поверки:</div>
+                                <div class="data-value">${vri.signCipher || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Владелец СИ:</div>
+                                <div class="data-value">${vri.miOwner || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Дата поверки:</div>
+                                <div class="data-value">${vri.vrfDate || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Действительна до:</div>
+                                <div class="data-value">${vri.validDate || 'N/A'}</div>
+                            </div>
+                            <div class="data-row">
+                                <div class="data-label">Документ:</div>
+                                <div class="data-value">${vri.docTitle || 'N/A'}</div>
+                            </div>
+                            ${vri.applicable ? `
+                            <div class="data-row">
+                                <div class="data-label">Номер свидетельства:</div>
+                                <div class="data-value">${vri.applicable.certNum || 'N/A'}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                
+                if (data.result && data.result.means && data.result.means.mieta) {
+                    html += `
+                        <div class="data-section">
+                            <h3>🔧 Эталоны</h3>
+                    `;
+                    
+                    data.result.means.mieta.forEach((mieta, index) => {
+                        html += `
+                            <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                                <h4>Эталон ${index + 1}</h4>
+                                <div class="data-row">
+                                    <div class="data-label">Регистрационный номер:</div>
+                                    <div class="data-value">${mieta.regNumber || 'N/A'}</div>
+                                </div>
+                                <div class="data-row">
+                                    <div class="data-label">Наименование:</div>
+                                    <div class="data-value">${mieta.mitypeTitle || 'N/A'}</div>
+                                </div>
+                                <div class="data-row">
+                                    <div class="data-label">Обозначение:</div>
+                                    <div class="data-value">${mieta.notation || 'N/A'}</div>
+                                </div>
+                                <div class="data-row">
+                                    <div class="data-label">Модификация:</div>
+                                    <div class="data-value">${mieta.modification || 'N/A'}</div>
+                                </div>
+                                <div class="data-row">
+                                    <div class="data-label">Заводской номер:</div>
+                                    <div class="data-value">${mieta.manufactureNum || 'N/A'}</div>
+                                </div>
+                                <div class="data-row">
+                                    <div class="data-label">Год выпуска:</div>
+                                    <div class="data-value">${mieta.manufactureYear || 'N/A'}</div>
+                                </div>
+                                <div class="data-row">
+                                    <div class="data-label">Разряд:</div>
+                                    <div class="data-value">${mieta.rankTitle || 'N/A'} (${mieta.rankCode || 'N/A'})</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `</div>`;
+                }
+                
+                if (data.result && data.result.info) {
+                    const info = data.result.info;
+                    html += `
+                        <div class="data-section">
+                            <h3>ℹ️ Дополнительная информация</h3>
+                            ${info.additional_info ? `
+                            <div class="data-row">
+                                <div class="data-label">Дополнительно:</div>
+                                <div class="data-value">${info.additional_info}</div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+                
+                this.dataContent.innerHTML = html;
+                this.rawData.textContent = JSON.stringify(data, null, 2);
+                this.toggleRaw.style.display = 'inline-block';
+            }
+            
+            toggleRawData() {
+                const isVisible = this.rawData.style.display === 'block';
+                this.rawData.style.display = isVisible ? 'none' : 'block';
+                this.toggleRaw.textContent = isVisible ? 'Показать JSON' : 'Скрыть JSON';
+            }
+        }
+        
+        // Инициализация приложения
+        document.addEventListener('DOMContentLoaded', () => {
+            new QRCodeScanner();
+        });
+    </script>
 </body>
 </html>
