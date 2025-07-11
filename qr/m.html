@@ -2,20 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR Scanner</title>
-    
-    <!-- PWA манифест -->
-    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiUVIgU2Nhbm5lciIsInNob3J0X25hbWUiOiJRUlNjYW4iLCJzdGFydF91cmwiOiIvIiwiZGlzcGxheSI6ImZ1bGxzY3JlZW4iLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzAwMDAwMCIsInRoZW1lX2NvbG9yIjoiIzAwN2ZmZiIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUIzYVdSMGFEMGlOVEV5SWlCb1pXbG5hSFE5SWpVeE1pSWdkbWxsZDBKdmVEMGlNQ0F3SURVNU5pQTBPVFlpSUdacGJHdzlJaU13TURkbVptWWlQanh5WldOMElIZzlJakUySWlCNVBTSXhOaUlnZDJsa2RHZzlJalEyTkNJZ2FHVnBaMmgwUFNJME5qUWlJSEo0UFNJeU5DSWdabWxzYkQwaVlXeHBZMlZpYkhWbElqNDhMM0psWTNRK1BIQmhkR2dnWkQwaVRUSXdNaUF5TXpGTWVXNXNSVXRZTWpGamQwZzBjV0ZITFZZMU5saDVWbTVJVmxFelFWRkpjM0J6TmpCaGVXWjRhVGw1SWlCbWFXeHNQU0pqZFhKeVpXNTBRMjlzYjNJaUx6NDhMM04yWno0PSIsInNpemVzIjoiNTEyeDUxMiIsInR5cGUiOiJpbWFnZS9zdmcreG1sIn1dfQ==">
-    
-    <!-- iOS Safari настройки -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="QR Scanner">
-    
-    <!-- QR Scanner библиотека -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.umd.min.js"></script>
-    
     <style>
         * {
             margin: 0;
@@ -25,434 +13,400 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #000;
-            color: #fff;
-            overflow: hidden;
-            height: 100vh;
-            position: relative;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
         }
         
         #scanner-container {
+            width: 100%;
+            height: 300px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
             position: relative;
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         
-        #qr-video {
+        #qr-reader {
             width: 100%;
             height: 100%;
-            object-fit: cover;
         }
         
-        #scanner-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
+        .button {
+            width: 100%;
+            padding: 15px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 10px;
         }
         
-        #scanner-frame {
-            width: 280px;
-            height: 280px;
-            border: 3px solid #007fff;
-            border-radius: 16px;
-            position: relative;
-            background: transparent;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+        .button:hover {
+            background: #0056CC;
         }
         
-        #scanner-frame::before,
-        #scanner-frame::after {
-            content: '';
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 3px solid #007fff;
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         
-        #scanner-frame::before {
-            top: -3px;
-            left: -3px;
-            border-right: none;
-            border-bottom: none;
-            border-top-left-radius: 16px;
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
         }
         
-        #scanner-frame::after {
-            bottom: -3px;
-            right: -3px;
-            border-left: none;
-            border-top: none;
-            border-bottom-right-radius: 16px;
+        .error {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8d7da;
+            color: #721c24;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
         }
         
-        #result-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #d1ecf1;
+            color: #0c5460;
+            border-radius: 8px;
+            border-left: 4px solid #17a2b8;
         }
         
-        #result-content {
-            background: #1a1a1a;
-            padding: 30px;
-            border-radius: 16px;
-            margin: 20px;
-            max-width: 90%;
+        .equipment-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+        }
+        
+        .equipment-info h3 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+        
+        .equipment-info p {
+            margin-bottom: 5px;
+            color: #856404;
+        }
+        
+        .loading {
             text-align: center;
-        }
-        
-        #result-text {
-            font-size: 16px;
-            line-height: 1.5;
-            margin-bottom: 20px;
-            word-break: break-all;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        #close-result {
-            background: #007fff;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        
-        #copy-result {
-            background: #333;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-        
-        #status {
-            position: absolute;
-            top: 50px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 14px;
-            z-index: 100;
+            color: #666;
+            font-style: italic;
         }
         
         .hidden {
-            display: none !important;
+            display: none;
         }
         
-        /* Анимация сканирования */
-        @keyframes scan {
-            0% {
-                transform: translateY(-100%);
-            }
-            100% {
-                transform: translateY(280px);
-            }
+        .manufacture-numbers {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #0066cc;
         }
         
-        #scanner-line {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #007fff, transparent);
-            animation: scan 2s infinite;
-        }
-        
-        /* Адаптивность */
-        @media (max-width: 480px) {
-            #scanner-frame {
-                width: 250px;
-                height: 250px;
-            }
-            
-            #result-content {
-                padding: 20px;
-            }
-            
-            #status {
-                top: 40px;
-                font-size: 12px;
-                padding: 8px 16px;
-            }
+        .manufacture-numbers strong {
+            color: #0066cc;
         }
     </style>
 </head>
 <body>
-    <div id="scanner-container">
-        <video id="qr-video" playsinline></video>
+    <div class="container">
+        <h1>QR Scanner</h1>
         
-        <div id="scanner-overlay">
-            <div id="scanner-frame">
-                <div id="scanner-line"></div>
-            </div>
+        <div id="scanner-container">
+            <div id="qr-reader"></div>
         </div>
         
-        <div id="status">Загрузка камеры...</div>
-    </div>
-    
-    <div id="result-overlay">
-        <div id="result-content">
-            <div id="result-text"></div>
-            <button id="close-result">Продолжить сканирование</button>
-            <button id="copy-result">Копировать</button>
-        </div>
+        <button id="start-btn" class="button">Начать сканирование</button>
+        <button id="stop-btn" class="button hidden">Остановить сканирование</button>
+        
+        <div id="result-container"></div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.umd.min.js"></script>
     <script>
-        class QRScannerApp {
-            constructor() {
-                this.scanner = null;
-                this.videoElement = document.getElementById('qr-video');
-                this.statusElement = document.getElementById('status');
-                this.resultOverlay = document.getElementById('result-overlay');
-                this.resultText = document.getElementById('result-text');
-                this.closeButton = document.getElementById('close-result');
-                this.copyButton = document.getElementById('copy-result');
-                this.isScanning = false;
-                
-                this.init();
-            }
+        let qrScanner = null;
+        let lersData = null;
+        
+        // Вставьте ваш Bearer токен здесь
+        const BEARER_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoic2NhZGEiLCJBY2NvdW50SWQiOiIxOTMiLCJUb2tlblZlcnNpb24iOiIxIiwiQXBwbGljYXRpb24iOiJRUiIsIlRva2VuSWQiOiIyOTg4NjAiLCJuYmYiOjE3NTIyMzI4NjYsImV4cCI6MTc1MjI2MDQwMCwiaXNzIjoiTEVSUyBBTVIgU2VydmVyIiwiYXVkIjoiaHR0cDovL2xvY2FsaG9zdDoxMDAwMCJ9.brxUuYl4XHti37zFof1IksTu8lLKgolEbe9kQfFP0P4';
+        
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const resultContainer = document.getElementById('result-container');
+        const qrReaderElement = document.getElementById('qr-reader');
+        
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Фоновый запрос к LERS API
+            loadLersData();
             
-            async init() {
-                try {
-                    // Проверяем поддержку камеры
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        throw new Error('Камера не поддерживается');
+            // Инициализация QR сканера
+            initQRScanner();
+        });
+        
+        // Фоновый запрос к LERS API
+        async function loadLersData() {
+            try {
+                showMessage('Загрузка данных оборудования...', 'info');
+                
+                const response = await fetch('http://lers.t-cntr.ru/api/v1/Core/Equipment', {
+                    headers: {
+                        'Authorization': `Bearer ${BEARER_TOKEN}`,
+                        'Content-Type': 'application/json'
                     }
-                    
-                    // Запрашиваем разрешение на камеру
-                    await this.requestCameraPermission();
-                    
-                    // Инициализируем сканер
-                    this.scanner = new QrScanner(
-                        this.videoElement,
-                        (result) => this.onScanSuccess(result),
-                        {
-                            onDecodeError: (error) => {
-                                // Игнорируем ошибки декодирования - это нормально
-                                console.debug('Decode error:', error);
-                            },
-                            highlightScanRegion: false,
-                            highlightCodeOutline: false,
-                            preferredCamera: 'environment', // Задняя камера
-                            maxScansPerSecond: 3
-                        }
-                    );
-                    
-                    // Настраиваем обработчики событий
-                    this.setupEventHandlers();
-                    
-                    // Запускаем сканирование
-                    await this.startScanning();
-                    
-                } catch (error) {
-                    console.error('Ошибка инициализации:', error);
-                    this.showStatus('Ошибка доступа к камере: ' + error.message);
-                }
-            }
-            
-            async requestCameraPermission() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: 'environment' } 
-                    });
-                    // Останавливаем поток - он нужен был только для получения разрешения
-                    stream.getTracks().forEach(track => track.stop());
-                } catch (error) {
-                    throw new Error('Необходимо разрешить доступ к камере');
-                }
-            }
-            
-            setupEventHandlers() {
-                this.closeButton.addEventListener('click', () => {
-                    this.hideResult();
-                    this.startScanning();
                 });
                 
-                this.copyButton.addEventListener('click', () => {
-                    this.copyToClipboard();
-                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
-                // Обработка ориентации устройства
-                window.addEventListener('orientationchange', () => {
-                    setTimeout(() => {
-                        if (this.scanner && this.isScanning) {
-                            this.scanner.stop();
-                            this.scanner.start();
-                        }
-                    }, 500);
-                });
-            }
-            
-            async startScanning() {
-                try {
-                    if (this.scanner) {
-                        await this.scanner.start();
-                        this.isScanning = true;
-                        this.showStatus('Наведите камеру на QR-код');
-                    }
-                } catch (error) {
-                    console.error('Ошибка запуска сканера:', error);
-                    this.showStatus('Ошибка запуска камеры');
-                }
-            }
-            
-            onScanSuccess(result) {
-                if (this.isScanning) {
-                    this.isScanning = false;
-                    this.scanner.stop();
-                    
-                    // Воспроизводим звук успеха (если доступно)
-                    this.playSuccessSound();
-                    
-                    // Показываем результат
-                    this.showResult(result.data);
-                }
-            }
-            
-            showResult(data) {
-                this.resultText.textContent = data;
-                this.resultOverlay.style.display = 'flex';
-                this.hideStatus();
-            }
-            
-            hideResult() {
-                this.resultOverlay.style.display = 'none';
-            }
-            
-            showStatus(message) {
-                this.statusElement.textContent = message;
-                this.statusElement.classList.remove('hidden');
-            }
-            
-            hideStatus() {
-                this.statusElement.classList.add('hidden');
-            }
-            
-            async copyToClipboard() {
-                try {
-                    await navigator.clipboard.writeText(this.resultText.textContent);
-                    this.copyButton.textContent = 'Скопировано!';
-                    setTimeout(() => {
-                        this.copyButton.textContent = 'Копировать';
-                    }, 2000);
-                } catch (error) {
-                    console.error('Ошибка копирования:', error);
-                    // Fallback для старых браузеров
-                    this.fallbackCopyToClipboard(this.resultText.textContent);
-                }
-            }
-            
-            fallbackCopyToClipboard(text) {
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                    this.copyButton.textContent = 'Скопировано!';
-                    setTimeout(() => {
-                        this.copyButton.textContent = 'Копировать';
-                    }, 2000);
-                } catch (error) {
-                    console.error('Ошибка копирования:', error);
-                }
-                document.body.removeChild(textArea);
-            }
-            
-            playSuccessSound() {
-                // Создаем короткий звуковой сигнал
-                try {
-                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    const oscillator = audioContext.createOscillator();
-                    const gainNode = audioContext.createGain();
-                    
-                    oscillator.connect(gainNode);
-                    gainNode.connect(audioContext.destination);
-                    
-                    oscillator.frequency.value = 800;
-                    oscillator.type = 'sine';
-                    
-                    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-                    
-                    oscillator.start(audioContext.currentTime);
-                    oscillator.stop(audioContext.currentTime + 0.1);
-                } catch (error) {
-                    console.debug('Звук недоступен:', error);
-                }
+                lersData = await response.json();
+                showMessage('Данные оборудования загружены успешно', 'info');
+                
+                // Очистка сообщения через 3 секунды
+                setTimeout(() => {
+                    const infoMessages = document.querySelectorAll('.info');
+                    infoMessages.forEach(msg => msg.remove());
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Ошибка загрузки данных LERS:', error);
+                showMessage(`Ошибка загрузки данных оборудования: ${error.message}`, 'error');
             }
         }
         
-        // Регистрируем Service Worker для PWA
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                const swCode = `
-                    const CACHE_NAME = 'qr-scanner-v1';
-                    const urlsToCache = ['/'];
-                    
-                    self.addEventListener('install', (event) => {
-                        event.waitUntil(
-                            caches.open(CACHE_NAME)
-                                .then((cache) => cache.addAll(urlsToCache))
-                        );
-                    });
-                    
-                    self.addEventListener('fetch', (event) => {
-                        event.respondWith(
-                            caches.match(event.request)
-                                .then((response) => response || fetch(event.request))
-                        );
-                    });
+        // Инициализация QR сканера
+        function initQRScanner() {
+            qrScanner = new QrScanner(
+                qrReaderElement,
+                result => onScanSuccess(result),
+                {
+                    onDecodeError: error => console.log('Decode error:', error),
+                    preferredCamera: 'environment',
+                    highlightScanRegion: true,
+                    highlightCodeOutline: true,
+                    maxScansPerSecond: 5
+                }
+            );
+        }
+        
+        // Обработка успешного сканирования
+        async function onScanSuccess(result) {
+            console.log('QR код отсканирован:', result.data);
+            
+            // Остановка сканирования
+            stopScanning();
+            
+            // Извлечение ID из URL
+            const urlMatch = result.data.match(/https:\/\/fgis\.gost\.ru\/fundmetrology\/cm\/results\/(.+)/);
+            if (!urlMatch) {
+                showMessage('Неверный формат QR кода. Ожидается URL вида: https://fgis.gost.ru/fundmetrology/cm/results/ID', 'error');
+                return;
+            }
+            
+            const id = urlMatch[1];
+            console.log('Извлеченный ID:', id);
+            
+            // Запрос к FGIS API
+            await fetchFGISData(id);
+        }
+        
+        // Запрос к FGIS API
+        async function fetchFGISData(id) {
+            try {
+                showMessage('Получение данных о средстве измерения...', 'info');
+                
+                const url = `https://fgis.gost.ru/fundmetrology/cm/iaux/vri/${id}`;
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Данные от FGIS:', data);
+                
+                // Извлечение заводского номера
+                const manufactureNum = data.result?.miInfo?.singleMI?.manufactureNum;
+                if (!manufactureNum) {
+                    throw new Error('Заводской номер не найден в ответе');
+                }
+                
+                // Отображение информации о средстве измерения
+                displayFGISInfo(data);
+                
+                // Поиск в данных LERS
+                findInLersData(manufactureNum);
+                
+            } catch (error) {
+                console.error('Ошибка получения данных FGIS:', error);
+                showMessage(`Ошибка получения данных: ${error.message}`, 'error');
+            }
+        }
+        
+        // Отображение информации от FGIS
+        function displayFGISInfo(data) {
+            const miInfo = data.result?.miInfo?.singleMI;
+            const vriInfo = data.result?.vriInfo;
+            
+            if (!miInfo) return;
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = `
+                <h3>Информация о средстве измерения</h3>
+                <p><strong>Тип:</strong> ${miInfo.mitypeType || 'Не указано'}</p>
+                <p><strong>Наименование:</strong> ${miInfo.mitypeTitle || 'Не указано'}</p>
+                <p><strong>Номер в реестре:</strong> ${miInfo.mitypeNumber || 'Не указано'}</p>
+                <div class="manufacture-numbers">
+                    <strong>Заводские номера:</strong> ${miInfo.manufactureNum || 'Не указано'}
+                </div>
+                <p><strong>Модификация:</strong> ${miInfo.modification || 'Не указано'}</p>
+                ${vriInfo ? `
+                    <p><strong>Организация поверки:</strong> ${vriInfo.organization || 'Не указано'}</p>
+                    <p><strong>Дата поверки:</strong> ${vriInfo.vrfDate || 'Не указано'}</p>
+                    <p><strong>Действительна до:</strong> ${vriInfo.validDate || 'Не указано'}</p>
+                    <p><strong>Владелец:</strong> ${vriInfo.miOwner || 'Не указано'}</p>
+                ` : ''}
+                ${data.result?.info?.additional_info ? `
+                    <p><strong>Дополнительная информация:</strong> ${data.result.info.additional_info}</p>
+                ` : ''}
+            `;
+            
+            resultContainer.appendChild(resultDiv);
+        }
+        
+        // Поиск в данных LERS
+        function findInLersData(manufactureNum) {
+            if (!lersData) {
+                showMessage('Данные оборудования еще не загружены', 'error');
+                return;
+            }
+            
+            console.log('Поиск заводского номера в LERS:', manufactureNum);
+            
+            // Разбиваем заводские номера на отдельные номера (разделенные ; или ,)
+            const numbers = manufactureNum.split(/[;,]/).map(num => num.trim());
+            
+            const foundEquipment = [];
+            
+            // Поиск в списке оборудования
+            if (lersData.list) {
+                lersData.list.forEach(equipment => {
+                    if (equipment.serialNumber) {
+                        numbers.forEach(num => {
+                            if (equipment.serialNumber.includes(num) || num.includes(equipment.serialNumber)) {
+                                foundEquipment.push(equipment);
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Отображение найденного оборудования
+            if (foundEquipment.length > 0) {
+                displayLersEquipment(foundEquipment);
+            } else {
+                showMessage('Оборудование с указанными заводскими номерами не найдено в системе LERS', 'info');
+            }
+        }
+        
+        // Отображение информации об оборудовании из LERS
+        function displayLersEquipment(equipment) {
+            equipment.forEach(item => {
+                const equipmentDiv = document.createElement('div');
+                equipmentDiv.className = 'equipment-info';
+                
+                // Поиск модели оборудования
+                const model = lersData.modelList?.find(m => m.id === item.equipmentModelId);
+                
+                equipmentDiv.innerHTML = `
+                    <h3>Найдено оборудование в LERS</h3>
+                    <p><strong>Серийный номер:</strong> ${item.serialNumber || 'Не указано'}</p>
+                    <p><strong>Модель:</strong> ${model?.title || 'Не указано'}</p>
+                    <p><strong>Номер пломбы:</strong> ${item.sealNumber || 'Не указано'}</p>
+                    <p><strong>Последняя поверка:</strong> ${item.lastCalibrationDate ? new Date(item.lastCalibrationDate).toLocaleDateString('ru-RU') : 'Не указано'}</p>
+                    <p><strong>Следующая поверка:</strong> ${item.scheduledCalibrationDate ? new Date(item.scheduledCalibrationDate).toLocaleDateString('ru-RU') : 'Не указано'}</p>
+                    <p><strong>Организация поверки:</strong> ${item.calibrationOrganization || 'Не указано'}</p>
+                    <p><strong>Номер в госреестре:</strong> ${item.calibrationStateRegisterNumber || 'Не указано'}</p>
+                    <p><strong>Сетевой адрес:</strong> ${item.networkAddress || 'Не указано'}</p>
+                    ${item.comment ? `<p><strong>Комментарий:</strong> ${item.comment}</p>` : ''}
                 `;
                 
-                const blob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                
-                navigator.serviceWorker.register(swUrl)
-                    .then((registration) => {
-                        console.log('SW registered:', registration);
-                    })
-                    .catch((error) => {
-                        console.log('SW registration failed:', error);
-                    });
+                resultContainer.appendChild(equipmentDiv);
             });
         }
         
-        // Запускаем приложение
-        window.addEventListener('load', () => {
-            new QRScannerApp();
-        });
+        // Показать сообщение
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            resultContainer.appendChild(messageDiv);
+        }
         
-        // Предотвращаем случайное обновление страницы
-        window.addEventListener('beforeunload', (event) => {
-            event.preventDefault();
-            event.returnValue = '';
+        // Начать сканирование
+        function startScanning() {
+            if (qrScanner) {
+                qrScanner.start().then(() => {
+                    startBtn.classList.add('hidden');
+                    stopBtn.classList.remove('hidden');
+                    
+                    // Очистка предыдущих результатов
+                    resultContainer.innerHTML = '';
+                    
+                }).catch(err => {
+                    console.error('Ошибка запуска сканера:', err);
+                    showMessage('Ошибка доступа к камере: ' + err.message, 'error');
+                });
+            }
+        }
+        
+        // Остановить сканирование
+        function stopScanning() {
+            if (qrScanner) {
+                qrScanner.stop();
+                startBtn.classList.remove('hidden');
+                stopBtn.classList.add('hidden');
+            }
+        }
+        
+        // Обработчики событий
+        startBtn.addEventListener('click', startScanning);
+        stopBtn.addEventListener('click', stopScanning);
+        
+        // Очистка при закрытии страницы
+        window.addEventListener('beforeunload', () => {
+            if (qrScanner) {
+                qrScanner.destroy();
+            }
         });
     </script>
 </body>
