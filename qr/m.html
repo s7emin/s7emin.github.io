@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Сканер QR-кодов</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    #result {
+      font-size: 1.2em;
+      margin-top: 20px;
+      color: green;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Сканер QR-кодов</h1>
+  <div id="reader"></div>
+  <div id="result">Ожидание сканирования...</div>
+
+  <script>
+    function onScanSuccess(decodedText, decodedResult) {
+      // Останавливаем сканер после успешного сканирования
+      html5QrcodeScanner.clear().then(_ => {
+        document.getElementById("result").innerText = "Результат: " + decodedText;
+      }).catch(error => {
+        console.error('Ошибка при остановке сканера: ', error);
+      });
+    }
+
+    // Создание и запуск сканера
+    const html5QrcodeScanner = new Html5QrcodeScanner(
+      "reader", 
+      { fps: 10, qrbox: 250 }, 
+      false
+    );
+
+    html5QrcodeScanner.render(onScanSuccess);
+  </script>
+
+</body>
+</html>
