@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UUST Quectel RM502 Modem Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            color: #667eea;
+            font-size: 18px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            color: #333;
+            font-weight: bold;
+        }
+
+        .metric-value.inactive {
+            color: #dc3545;
+        }
+
+        .signal-bar {
+            width: 100%;
+            height: 30px;
+            background: #eee;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-top: 10px;
+            position: relative;
+        }
+
+        .signal-fill {
+            height: 100%;
+            transition: width 0.5s, background 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .excellent { background: #28a745; }
+        .good { background: #5cb85c; }
+        .fair { background: #f0ad4e; }
+        .poor { background: #d9534f; }
+
+        .carrier-list {
+            margin-top: 10px;
+        }
+
+        .carrier-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+        }
+
+        .carrier-item.primary {
+            border-left-color: #28a745;
+        }
+
+        .console {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .console-line {
+            margin-bottom: 5px;
+        }
+
+        .console-line.command {
+            color: #4ec9b0;
+        }
+
+        .console-line.response {
+            color: #ce9178;
+        }
+
+        .console-line.error {
+            color: #f48771;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        select {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📡 UUST Quectel RM502 Modem Monitor</h1>
+            <div class="connection-status">
+                <div class="status-indicator" id="statusIndicator"></div>
+                <span id="statusText">Отключено</span>
+                <button id="connectBtn" onclick="connectSerial()">Подключиться</button>
+                <button id="disconnectBtn" onclick="disconnectSerial()" disabled>Отключиться</button>
+            </div>
+        </div>
+
+
+
+        <div class="grid">
+            <div class="card">
+                <h2>📶 Уровень сигнала</h2>
+                <div class="metric">
+                    <span class="metric-label">RSRP:</span>
+                    <span class="metric-value" id="rsrp">-- dBm</span>
+                </div>
+                <div class="signal-bar">
+                    <div class="signal-fill" id="rsrpBar" style="width: 0%">0%</div>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">RSRQ:</span>
+                    <span class="metric-value" id="rsrq">-- dB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">SINR:</span>
+                    <span class="metric-value" id="sinr">-- dB</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">RSSI:</span>
+                    <span class="metric-value" id="rssi">-- dBm</span>
+                </div>
+                <h2 style="margin-top: 20px; font-size: 16px;">📡 RSRP по антеннам</h2>
+                <div class="metric">
+                    <span class="metric-label">Антенна 0:</span>
+                    <span class="metric-value" id="rsrp0-value"><span id="rsrp0">--</span> dBm</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Антенна 1:</span>
+                    <span class="metric-value" id="rsrp1-value"><span id="rsrp1">--</span> dBm</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Антенна 2:</span>
+                    <span class="metric-value" id="rsrp2-value"><span id="rsrp2">--</span> dBm</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Антенна 3:</span>
+                    <span class="metric-value" id="rsrp3-value"><span id="rsrp3">--</span> dBm</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📡 Информация о сети</h2>
+                <div class="metric">
+                    <span class="metric-label">Режим:</span>
+                    <span class="metric-value" id="mode">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Оператор:</span>
+                    <span class="metric-value" id="operator">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Cell ID:</span>
+                    <span class="metric-value" id="cellId">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">PCI:</span>
+                    <span class="metric-value" id="pci">--</span>
+                </div>
+                <h2 style="margin-top: 20px; font-size: 16px;">🎯 Параметры LTE</h2>
+                <div class="metric">
+                    <span class="metric-label">EARFCN:</span>
+                    <span class="metric-value" id="earfcn">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Band:</span>
+                    <span class="metric-value" id="band">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Bandwidth:</span>
+                    <span class="metric-value" id="bandwidth">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">CQI:</span>
+                    <span class="metric-value" id="cqi">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">TX Power:</span>
+                    <span class="metric-value" id="txPower">-- dBm</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📊 Carrier Aggregation</h2>
+                <div class="metric">
+                    <span class="metric-label">Количество CA:</span>
+                    <span class="metric-value" id="caCount">0</span>
+                </div>
+                <div class="carrier-list" id="carrierList">
+                    <p style="color: #999; text-align: center;">Нет данных</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚙️ Управление</h2>
+            <div class="controls">
+                <button onclick="refreshData()" id="refreshBtn" disabled>🔄 Обновить данные</button>
+                <button onclick="getModemInfo()" id="infoBtn" disabled>ℹ️ Информация о модеме</button>
+                <button onclick="clearConsole()">🗑️ Очистить консоль</button>
+                <select id="refreshInterval">
+                    <option value="0">Ручное обновление</option>
+                    <option value="2000">Обновление: 2 сек</option>
+                    <option value="5000" selected>Обновление: 5 сек</option>
+                    <option value="10000">Обновление: 10 сек</option>
+                </select>
+            </div>
+            <div class="auto-refresh">
+                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+                <label for="autoRefresh">Автоматическое обновление</label>
+            </div>
+            <div class="console" id="console"></div>
+        </div>
+    </div>
+
+    <script>
+        let port = null;
+        let reader = null;
+        let writer = null;
+        let isConnected = false;
+        let autoRefreshInterval = null;
+
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '';
+        }
+
+        async function connectSerial() {
+            try {
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 115200 });
+
+                const textDecoder = new TextDecoderStream();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                reader = textDecoder.readable.getReader();
+
+                const textEncoder = new TextEncoderStream();
+                const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+                writer = textEncoder.writable.getWriter();
+
+                isConnected = true;
+                updateConnectionStatus(true);
+                log('Подключено к COM порту', 'response');
+
+                document.getElementById('refreshBtn').disabled = false;
+                document.getElementById('infoBtn').disabled = false;
+
+                await refreshData();
+            } catch (error) {
+                log(`Ошибка подключения: ${error.message}`, 'error');
+                alert('Не удалось подключиться к COM порту. Убедитесь, что используете Chrome/Edge и порт не занят.');
+            }
+        }
+
+        async function disconnectSerial() {
+            try {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                    document.getElementById('autoRefresh').checked = false;
+                }
+
+                if (reader) {
+                    try {
+                        await reader.cancel();
+                    } catch (e) {
+                        console.log('Reader cancel error:', e);
+                    }
+                    reader = null;
+                }
+                
+                if (writer) {
+                    try {
+                        await writer.close();
+                    } catch (e) {
+                        console.log('Writer close error:', e);
+                    }
+                    writer = null;
+                }
+                
+                if (port) {
+                    try {
+                        await port.close();
+                    } catch (e) {
+                        console.log('Port close error:', e);
+                    }
+                    port = null;
+                }
+
+                isConnected = false;
+                updateConnectionStatus(false);
+                log('Отключено от COM порта', 'response');
+
+                document.getElementById('refreshBtn').disabled = true;
+                document.getElementById('infoBtn').disabled = true;
+            } catch (error) {
+                log(`Ошибка отключения: ${error.message}`, 'error');
+                // Force cleanup even if there was an error
+                reader = null;
+                writer = null;
+                port = null;
+                isConnected = false;
+                updateConnectionStatus(false);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+
+            if (connected) {
+                indicator.classList.add('connected');
+                statusText.textContent = 'Подключено';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                indicator.classList.remove('connected');
+                statusText.textContent = 'Отключено';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        async function sendATCommand(command) {
+            if (!writer) return null;
+
+            try {
+                log(`> ${command}`, 'command');
+                await writer.write(command + '\r\n');
+                
+                let response = '';
+                let timeout = setTimeout(() => {
+                    throw new Error('Timeout');
+                }, 3000);
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    response += value;
+                    
+                    if (response.includes('OK') || response.includes('ERROR')) {
+                        clearTimeout(timeout);
+                        break;
+                    }
+                }
+
+                log(`< ${response.trim()}`, 'response');
+                return response;
+            } catch (error) {
+                log(`Ошибка: ${error.message}`, 'error');
+                return null;
+            }
+        }
+
+        function parseBandwidth(bw) {
+            const bwMap = {0: '1.4', 1: '3', 2: '5', 3: '10', 4: '15', 5: '20'};
+            return bwMap[bw] || bw;
+        }
+
+        function parseResourceBlocks(rb) {
+            // Convert LTE Resource Blocks to MHz
+            const rbMap = {
+                6: '1.4',
+                15: '3',
+                25: '5',
+                50: '10',
+                75: '15',
+                100: '20'
+            };
+            return rbMap[rb] || rb;
+        }
+
+        function getSignalQuality(rsrp) {
+            if (rsrp >= -80) return { quality: 'excellent', percent: 100 };
+            if (rsrp >= -90) return { quality: 'good', percent: 75 };
+            if (rsrp >= -100) return { quality: 'fair', percent: 50 };
+            return { quality: 'poor', percent: 25 };
+        }
+
+        async function refreshData() {
+            if (!isConnected) return;
+
+            // Get serving cell info
+            const servingCell = await sendATCommand('AT+QENG="servingcell"');
+            if (servingCell) {
+                parseServingCell(servingCell);
+            }
+
+            // Get CA info
+            const caInfo = await sendATCommand('AT+QCAINFO');
+            if (caInfo) {
+                parseCAInfo(caInfo);
+            }
+
+            // Get RSRP per antenna
+            const rsrpInfo = await sendATCommand('AT+QRSRP');
+            if (rsrpInfo) {
+                parseRSRP(rsrpInfo);
+            }
+        }
+
+        function parseServingCell(response) {
+            const lines = response.split('\n');
+            for (let line of lines) {
+                if (line.includes('+QENG:') && line.includes('LTE')) {
+                    // Split properly handling the +QENG: prefix
+                    let data = line.substring(line.indexOf('"'));
+                    const parts = data.split(',').map(s => s.trim().replace(/"/g, ''));
+                    
+                    // parts[0] = "servingcell"
+                    // parts[1] = state (NOCONN/CONN) - not displayed
+                    document.getElementById('mode').textContent = (parts[2] + ' ' + parts[3]) || '--'; // LTE FDD
+                    
+                    const mcc = parts[4];
+                    const mnc = parts[5];
+                    document.getElementById('operator').textContent = `${mcc}-${mnc}`;
+                    
+                    document.getElementById('cellId').textContent = parts[6] || '--';
+                    document.getElementById('pci').textContent = parts[7] || '--';
+                    document.getElementById('earfcn').textContent = parts[8] || '--';
+                    document.getElementById('band').textContent = 'Band ' + parts[9] || '--';
+                    
+                    const ulBw = parseBandwidth(parseInt(parts[10]));
+                    const dlBw = parseBandwidth(parseInt(parts[11]));
+                    document.getElementById('bandwidth').textContent = `↑${ulBw} / ↓${dlBw} MHz`;
+                    
+                    // TAC is at parts[12]
+                    const rsrp = parseInt(parts[13]);
+                    const rsrq = parseInt(parts[14]);
+                    const rssi = parseInt(parts[15]);
+                    const sinr = parseInt(parts[16]);
+                    const cqi = parts[17];
+                    const txPower = parts[18];
+                    
+                    document.getElementById('rsrp').textContent = `${rsrp} dBm`;
+                    document.getElementById('rsrq').textContent = `${rsrq} dB`;
+                    document.getElementById('rssi').textContent = `${rssi} dBm`;
+                    document.getElementById('sinr').textContent = `${sinr} dB`;
+                    document.getElementById('cqi').textContent = cqi || '--';
+                    
+                    // TX Power может быть в диапазоне -20 до 230 (0.1dBm единицы)
+                    if (txPower && txPower !== '-') {
+                        const txPowerValue = parseInt(txPower);
+                        // Конвертируем из 0.1dBm в dBm
+                        const txPowerDbm = (txPowerValue / 10).toFixed(1);
+                        document.getElementById('txPower').textContent = `${txPowerDbm} dBm`;
+                    } else {
+                        document.getElementById('txPower').textContent = '--';
+                    }
+                    
+                    const signal = getSignalQuality(rsrp);
+                    const bar = document.getElementById('rsrpBar');
+                    bar.style.width = signal.percent + '%';
+                    bar.className = 'signal-fill ' + signal.quality;
+                    bar.textContent = `${signal.percent}% (${rsrp} dBm)`;
+                    
+                    break;
+                }
+            }
+        }
+
+        function parseCAInfo(response) {
+            const lines = response.split('\n');
+            const carriers = [];
+            
+            for (let line of lines) {
+                if (line.includes('+QCAINFO:')) {
+                    // Extract data after +QCAINFO:
+                    let data = line.substring(line.indexOf(':') + 1);
+                    const parts = data.split(',').map(s => s.trim().replace(/"/g, ''));
+                    
+                    const type = parts[0]; // PCC or SCC
+                    const earfcn = parts[1];
+                    // In QCAINFO, bandwidth is in Resource Blocks (RB)
+                    const rbValue = parseInt(parts[2]);
+                    const bwMhz = parseResourceBlocks(rbValue);
+                    const bw = `${rbValue} RB (${bwMhz} MHz)`; // Show both RB and MHz
+                    const band = parts[3];
+                    const cellState = parts[4]; // Cell state (not MIMO!)
+                    const pci = parts[5];
+                    const rsrp = parts[6];
+                    const rsrq = parts[7];
+                    const rssi = parts[8];
+                    const sinr = parts[9];
+                    
+                    carriers.push({ type, earfcn, bw, band, cellState, pci, rsrp, rsrq, rssi, sinr });
+                }
+            }
+            
+            document.getElementById('caCount').textContent = carriers.length;
+            
+            const carrierList = document.getElementById('carrierList');
+            if (carriers.length > 0) {
+                carrierList.innerHTML = '';
+                carriers.forEach(c => {
+                    const item = document.createElement('div');
+                    item.className = 'carrier-item' + (c.type === 'PCC' ? ' primary' : '');
+                    
+                    // Show SINR only for PCC (primary carrier)
+                    const sinrText = c.type === 'PCC' ? ` | SINR: ${c.sinr} dB` : '';
+                    
+                    item.innerHTML = `
+                        <strong>${c.type}</strong> - ${c.band}<br>
+                        EARFCN: ${c.earfcn} | BW: ${c.bw} | PCI: ${c.pci}<br>
+                        RSRP: ${c.rsrp} dBm | RSRQ: ${c.rsrq} dB${sinrText}
+                    `;
+                    carrierList.appendChild(item);
+                });
+            } else {
+                carrierList.innerHTML = '<p style="color: #999; text-align: center;">Нет данных CA</p>';
+            }
+        }
+
+        function parseRSRP(response) {
+            const lines = response.split('\n');
+            
+            for (let line of lines) {
+                if (line.includes('+QRSRP:')) {
+                    // Format: +QRSRP: <rsrp0>,<rsrp1>,<rsrp2>,<rsrp3>
+                    let data = line.substring(line.indexOf(':') + 1);
+                    const parts = data.split(',').map(s => s.trim());
+                    
+                    // Update antenna RSRP values with color coding
+                    const updateAntenna = (index, rsrpValue) => {
+                        const rsrp = parseInt(rsrpValue);
+                        const valueElement = document.getElementById(`rsrp${index}`);
+                        const containerElement = document.getElementById(`rsrp${index}-value`);
+                        
+                        if (rsrp !== 0) {
+                            valueElement.textContent = rsrp;
+                            // Mark as inactive if <= -140 dBm (antenna not working)
+                            if (rsrp <= -140) {
+                                containerElement.classList.add('inactive');
+                            } else {
+                                containerElement.classList.remove('inactive');
+                            }
+                        } else {
+                            valueElement.textContent = '--';
+                            containerElement.classList.remove('inactive');
+                        }
+                    };
+                    
+                    if (parts[0]) updateAntenna(0, parts[0]);
+                    if (parts[1]) updateAntenna(1, parts[1]);
+                    if (parts[2]) updateAntenna(2, parts[2]);
+                    if (parts[3]) updateAntenna(3, parts[3]);
+                    
+                    break;
+                }
+            }
+        }
+
+        async function getModemInfo() {
+            if (!isConnected) return;
+            
+            await sendATCommand('ATI');
+            await sendATCommand('AT+QGMR');
+            await sendATCommand('AT+CIMI');
+            await sendATCommand('AT+CNUM');
+        }
+
+        function toggleAutoRefresh() {
+            const enabled = document.getElementById('autoRefresh').checked;
+            const interval = parseInt(document.getElementById('refreshInterval').value);
+            
+            if (enabled && interval > 0) {
+                autoRefreshInterval = setInterval(refreshData, interval);
+                log(`Автообновление включено (${interval/1000} сек)`, 'response');
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+                log('Автообновление выключено', 'response');
+            }
+        }
+
+        document.getElementById('refreshInterval').addEventListener('change', function() {
+            if (document.getElementById('autoRefresh').checked) {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+                toggleAutoRefresh();
+            }
+        });
+
+        // Check Web Serial API support
+        if (!('serial' in navigator)) {
+            const warning = document.createElement('div');
+            warning.className = 'warning';
+            warning.innerHTML = '❌ Ваш браузер не поддерживает Web Serial API. Используйте Chrome, Edge или Opera версии 89+.';
+            document.querySelector('.container').insertBefore(warning, document.querySelector('.grid'));
+            document.getElementById('connectBtn').disabled = true;
+        }
+    </script>
+</body>
+</html>
