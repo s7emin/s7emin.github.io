@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,7 +28,7 @@
             background: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
@@ -58,8 +59,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         button {
@@ -93,7 +101,7 @@
             background: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .card h2 {
@@ -150,10 +158,21 @@
             font-size: 12px;
         }
 
-        .excellent { background: #28a745; }
-        .good { background: #5cb85c; }
-        .fair { background: #f0ad4e; }
-        .poor { background: #d9534f; }
+        .excellent {
+            background: #28a745;
+        }
+
+        .good {
+            background: #5cb85c;
+        }
+
+        .fair {
+            background: #f0ad4e;
+        }
+
+        .poor {
+            background: #d9534f;
+        }
 
         .carrier-list {
             margin-top: 10px;
@@ -199,6 +218,20 @@
             color: #f48771;
         }
 
+        .console-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        #cmdInput {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
         .controls {
             display: flex;
             gap: 10px;
@@ -236,19 +269,18 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
-            <h1>📡 UUST Quectel RM502 Modem Monitor</h1>
+            <h1>📡 UUST Quectel RM502 Modem Monitor (LTE Mode)</h1>
             <div class="connection-status">
                 <div class="status-indicator" id="statusIndicator"></div>
                 <span id="statusText">Отключено</span>
-                <button id="connectBtn" onclick="connectSerial()">Подключиться</button>
-                <button id="disconnectBtn" onclick="disconnectSerial()" disabled>Отключиться</button>
+                <button id="connectBtn" onclick="app.connect()">Подключиться</button>
+                <button id="disconnectBtn" onclick="app.disconnect()" disabled>Отключиться</button>
             </div>
         </div>
-
-
 
         <div class="grid">
             <div class="card">
@@ -345,11 +377,19 @@
         </div>
 
         <div class="card">
-            <h2>⚙️ Управление</h2>
+            <h2>⚙️ Управление и Консоль</h2>
+
+            <div class="console-input-container">
+                <input type="text" id="cmdInput" placeholder="Введите AT команду (например: AT+CSQ)">
+                <button onclick="app.sendUserCommand()" id="sendBtn" disabled>Отправить</button>
+            </div>
+
+            <div class="console" id="console"></div>
+
             <div class="controls">
-                <button onclick="refreshData()" id="refreshBtn" disabled>🔄 Обновить данные</button>
-                <button onclick="getModemInfo()" id="infoBtn" disabled>ℹ️ Информация о модеме</button>
-                <button onclick="clearConsole()">🗑️ Очистить консоль</button>
+                <button onclick="app.refreshData()" id="refreshBtn" disabled>🔄 Обновить данные</button>
+                <button onclick="app.getModemInfo()" id="infoBtn" disabled>ℹ️ Информация о модеме</button>
+                <button onclick="app.clearConsole()">🗑️ Очистить консоль</button>
                 <select id="refreshInterval">
                     <option value="0">Ручное обновление</option>
                     <option value="2000">Обновление: 2 сек</option>
@@ -358,403 +398,479 @@
                 </select>
             </div>
             <div class="auto-refresh">
-                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+                <input type="checkbox" id="autoRefresh" onchange="app.toggleAutoRefresh()">
                 <label for="autoRefresh">Автоматическое обновление</label>
             </div>
-            <div class="console" id="console"></div>
         </div>
     </div>
 
     <script>
-        let port = null;
-        let reader = null;
-        let writer = null;
-        let isConnected = false;
-        let autoRefreshInterval = null;
+        /**
+         * Класс для работы с модемом Quectel через Web Serial API.
+         * Обеспечивает последовательное выполнение команд.
+         */
+        class QuectelModem {
+            constructor() {
+                this.port = null;
+                this.reader = null;
+                this.writer = null;
+                this.isConnected = false;
+                this.commandQueue = Promise.resolve(); // Очередь промисов для сериализации команд
+            }
 
-        function log(message, type = 'info') {
-            const console = document.getElementById('console');
-            const line = document.createElement('div');
-            line.className = `console-line ${type}`;
-            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-            console.appendChild(line);
-            console.scrollTop = console.scrollHeight;
-        }
+            /**
+             * Проверка поддержки API
+             */
+            static isSupported() {
+                return 'serial' in navigator;
+            }
 
-        function clearConsole() {
-            document.getElementById('console').innerHTML = '';
-        }
+            /**
+             * Подключение к порту
+             */
+            async connect() {
+                try {
+                    this.port = await navigator.serial.requestPort();
+                    await this.port.open({ baudRate: 115200 });
 
-        async function connectSerial() {
-            try {
-                port = await navigator.serial.requestPort();
-                await port.open({ baudRate: 115200 });
+                    const textDecoder = new TextDecoderStream();
+                    this.readableStreamClosed = this.port.readable.pipeTo(textDecoder.writable);
+                    this.reader = textDecoder.readable.getReader();
 
-                const textDecoder = new TextDecoderStream();
-                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-                reader = textDecoder.readable.getReader();
+                    const textEncoder = new TextEncoderStream();
+                    this.writableStreamClosed = textEncoder.readable.pipeTo(this.port.writable);
+                    this.writer = textEncoder.writable.getWriter();
 
-                const textEncoder = new TextEncoderStream();
-                const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
-                writer = textEncoder.writable.getWriter();
+                    this.isConnected = true;
+                    return true;
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    throw error;
+                }
+            }
 
-                isConnected = true;
-                updateConnectionStatus(true);
-                log('Подключено к COM порту', 'response');
+            /**
+             * Отключение к порту
+             */
+            async disconnect() {
+                if (!this.isConnected) return;
 
-                document.getElementById('refreshBtn').disabled = false;
-                document.getElementById('infoBtn').disabled = false;
+                // Сначала отменяем чтение, это позволит закрыть потоки
+                if (this.reader) {
+                    await this.reader.cancel().catch(console.error);
+                    this.reader = null; // Освобождаем ссылку
+                }
 
-                await refreshData();
-            } catch (error) {
-                log(`Ошибка подключения: ${error.message}`, 'error');
-                alert('Не удалось подключиться к COM порту. Убедитесь, что используете Chrome/Edge и порт не занят.');
+                if (this.writer) {
+                    await this.writer.close().catch(console.error);
+                    this.writer = null;
+                }
+
+                if (this.port) {
+                    await this.port.close().catch(console.error);
+                    this.port = null;
+                }
+
+                this.isConnected = false;
+            }
+
+            /**
+             * Отправка AT команды с блокировкой очереди.
+             * Гарантирует, что команды не будут перекрываться.
+             * @param {string} command - AT команда (без \r\n)
+             * @param {number} timeoutMs - Таймаут ожидания ответа
+             * @returns {Promise<string>} - Ответ модема
+             */
+            async sendCommand(command, timeoutMs = 3000) {
+                // Добавляем выполнение команды в конец очереди
+                const result = this.commandQueue.then(async () => {
+                    if (!this.isConnected) throw new Error("Not connected");
+                    return await this._executeRawCommand(command, timeoutMs);
+                });
+
+                // Обновляем хвост очереди, ловим ошибки чтобы очередь не "застряла"
+                this.commandQueue = result.catch(err => {
+                    console.error("Command failed in queue:", err);
+                    throw err;
+                });
+
+                return result;
+            }
+
+            /**
+             * Внутренняя логика отправки и чтения
+             */
+            async _executeRawCommand(command, timeoutMs) {
+                try {
+                    await this.writer.write(command + '\r\n');
+
+                    let response = '';
+                    let reading = true;
+
+                    // Создаем промис для таймаута
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error('Timeout')), timeoutMs);
+                    });
+
+                    // Цикл чтения
+                    const readLoop = async () => {
+                        while (reading) {
+                            const { value, done } = await this.reader.read();
+                            if (done) break;
+
+                            response += value;
+                            if (response.includes('OK') || response.includes('ERROR')) {
+                                reading = false;
+                            }
+                        }
+                        return response;
+                    };
+
+                    // Гонка: или чтение завершится, или таймаут сработает
+                    return await Promise.race([readLoop(), timeoutPromise]);
+
+                } catch (error) {
+                    // Если произошел таймаут или ошибка записи, нам нужно как-то восстановиться
+                    throw error;
+                }
             }
         }
 
-        async function disconnectSerial() {
-            try {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = null;
-                    document.getElementById('autoRefresh').checked = false;
-                }
+        /**
+         * Класс приложения (UI и логика)
+         */
+        class App {
+            constructor() {
+                this.modem = new QuectelModem();
+                this.autoRefreshInterval = null;
 
-                if (reader) {
-                    try {
-                        await reader.cancel();
-                    } catch (e) {
-                        console.log('Reader cancel error:', e);
-                    }
-                    reader = null;
-                }
-                
-                if (writer) {
-                    try {
-                        await writer.close();
-                    } catch (e) {
-                        console.log('Writer close error:', e);
-                    }
-                    writer = null;
-                }
-                
-                if (port) {
-                    try {
-                        await port.close();
-                    } catch (e) {
-                        console.log('Port close error:', e);
-                    }
-                    port = null;
-                }
+                this.ui = {
+                    connectBtn: document.getElementById('connectBtn'),
+                    disconnectBtn: document.getElementById('disconnectBtn'),
+                    refreshBtn: document.getElementById('refreshBtn'),
+                    infoBtn: document.getElementById('infoBtn'),
+                    sendBtn: document.getElementById('sendBtn'),
+                    cmdInput: document.getElementById('cmdInput'),
+                    console: document.getElementById('console'),
+                    statusIndicator: document.getElementById('statusIndicator'),
+                    statusText: document.getElementById('statusText'),
+                    refreshInterval: document.getElementById('refreshInterval'),
+                    autoRefresh: document.getElementById('autoRefresh')
+                };
 
-                isConnected = false;
-                updateConnectionStatus(false);
-                log('Отключено от COM порта', 'response');
-
-                document.getElementById('refreshBtn').disabled = true;
-                document.getElementById('infoBtn').disabled = true;
-            } catch (error) {
-                log(`Ошибка отключения: ${error.message}`, 'error');
-                // Force cleanup even if there was an error
-                reader = null;
-                writer = null;
-                port = null;
-                isConnected = false;
-                updateConnectionStatus(false);
+                this.setupEventListeners();
+                this.checkSupport();
             }
-        }
 
-        function updateConnectionStatus(connected) {
-            const indicator = document.getElementById('statusIndicator');
-            const statusText = document.getElementById('statusText');
-            const connectBtn = document.getElementById('connectBtn');
-            const disconnectBtn = document.getElementById('disconnectBtn');
+            setupEventListeners() {
+                this.ui.cmdInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendUserCommand();
+                });
 
-            if (connected) {
-                indicator.classList.add('connected');
-                statusText.textContent = 'Подключено';
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = false;
-            } else {
-                indicator.classList.remove('connected');
-                statusText.textContent = 'Отключено';
-                connectBtn.disabled = false;
-                disconnectBtn.disabled = true;
+                this.ui.refreshInterval.addEventListener('change', () => {
+                    if (this.ui.autoRefresh.checked) {
+                        this.toggleAutoRefresh(true); // Restart with new interval
+                    }
+                });
             }
-        }
 
-        async function sendATCommand(command) {
-            if (!writer) return null;
+            checkSupport() {
+                if (!QuectelModem.isSupported()) {
+                    const warning = document.createElement('div');
+                    warning.className = 'warning';
+                    warning.innerHTML = '❌ Ваш браузер не поддерживает Web Serial API. Используйте Chrome, Edge или Opera версии 89+.';
+                    document.querySelector('.container').insertBefore(warning, document.querySelector('.grid'));
+                    this.ui.connectBtn.disabled = true;
+                }
+            }
 
-            try {
-                log(`> ${command}`, 'command');
-                await writer.write(command + '\r\n');
-                
-                let response = '';
-                let timeout = setTimeout(() => {
-                    throw new Error('Timeout');
-                }, 3000);
+            log(message, type = 'info') {
+                const line = document.createElement('div');
+                line.className = `console-line ${type}`;
+                line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                this.ui.console.appendChild(line);
+                this.ui.console.scrollTop = this.ui.console.scrollHeight;
+            }
 
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    response += value;
-                    
-                    if (response.includes('OK') || response.includes('ERROR')) {
-                        clearTimeout(timeout);
+            clearConsole() {
+                this.ui.console.innerHTML = '';
+            }
+
+            async connect() {
+                try {
+                    await this.modem.connect();
+                    this.updateConnectionStatus(true);
+                    this.log('Подключено к COM порту', 'response');
+                    await this.refreshData();
+                } catch (error) {
+                    this.log(`Ошибка подключения: ${error.message}`, 'error');
+                    alert('Не удалось подключиться. Проверьте, что порт не занят другой программой.');
+                }
+            }
+
+            async disconnect() {
+                try {
+                    this.stopAutoRefresh();
+                    await this.modem.disconnect();
+                    this.updateConnectionStatus(false);
+                    this.log('Отключено от COM порта', 'response');
+                } catch (error) {
+                    this.log(`Ошибка отключения: ${error.message}`, 'error');
+                    this.updateConnectionStatus(false);
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                if (connected) {
+                    this.ui.statusIndicator.classList.add('connected');
+                    this.ui.statusText.textContent = 'Подключено';
+                    this.ui.connectBtn.disabled = true;
+                    this.ui.disconnectBtn.disabled = false;
+                    this.ui.refreshBtn.disabled = false;
+                    this.ui.infoBtn.disabled = false;
+                    this.ui.sendBtn.disabled = false;
+                } else {
+                    this.ui.statusIndicator.classList.remove('connected');
+                    this.ui.statusText.textContent = 'Отключено';
+                    this.ui.connectBtn.disabled = false;
+                    this.ui.disconnectBtn.disabled = true;
+                    this.ui.refreshBtn.disabled = true;
+                    this.ui.infoBtn.disabled = true;
+                    this.ui.sendBtn.disabled = true;
+                }
+            }
+
+            async sendUserCommand() {
+                const cmd = this.ui.cmdInput.value.trim();
+                if (!cmd) return;
+
+                this.ui.cmdInput.value = '';
+                this.log(`> ${cmd}`, 'command');
+
+                try {
+                    const response = await this.modem.sendCommand(cmd, 10000); // 10s timeout for user commands
+                    this.log(`< ${response.trim()}`, 'response');
+                } catch (error) {
+                    this.log(`Ошибка: ${error.message}`, 'error');
+                }
+            }
+
+            async getModemInfo() {
+                if (!this.modem.isConnected) return;
+                const commands = ['ATI', 'AT+QGMR', 'AT+CIMI', 'AT+CNUM'];
+                for (const cmd of commands) {
+                    this.log(`> ${cmd}`, 'command');
+                    const resp = await this.modem.sendCommand(cmd);
+                    this.log(`< ${resp.trim()}`, 'response');
+                }
+            }
+
+            toggleAutoRefresh(forceRestart = false) {
+                const enabled = this.ui.autoRefresh.checked;
+                const interval = parseInt(this.ui.refreshInterval.value);
+
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                    this.autoRefreshInterval = null;
+                }
+
+                if (enabled && interval > 0) {
+                    this.autoRefreshInterval = setInterval(() => this.refreshData(), interval);
+                    if (!forceRestart) this.log(`Автообновление включено (${interval / 1000} сек)`, 'response');
+                } else {
+                    if (!forceRestart) this.log('Автообновление выключено', 'response');
+                }
+            }
+
+            stopAutoRefresh() {
+                if (this.autoRefreshInterval) {
+                    clearInterval(this.autoRefreshInterval);
+                    this.autoRefreshInterval = null;
+                }
+                this.ui.autoRefresh.checked = false;
+            }
+
+            async refreshData() {
+                if (!this.modem.isConnected) return;
+
+                try {
+                    // Update Serving Cell
+                    const servingCell = await this.modem.sendCommand('AT+QENG="servingcell"');
+                    this.parseServingCell(servingCell);
+
+                    // Update CA
+                    const caInfo = await this.modem.sendCommand('AT+QCAINFO');
+                    this.parseCAInfo(caInfo);
+
+                    // Update RSRP per antenna
+                    const rsrpInfo = await this.modem.sendCommand('AT+QRSRP');
+                    this.parseRSRP(rsrpInfo);
+                } catch (err) {
+                    // console.log("Refresh error:", err);
+                }
+            }
+
+            // --- Parsing Logic ---
+
+            parseBandwidth(bw) {
+                const bwMap = { 0: '1.4', 1: '3', 2: '5', 3: '10', 4: '15', 5: '20' };
+                return bwMap[bw] || bw;
+            }
+
+            parseResourceBlocks(rb) {
+                const rbMap = { 6: '1.4', 15: '3', 25: '5', 50: '10', 75: '15', 100: '20' };
+                return rbMap[rb] || rb;
+            }
+
+            getSignalQuality(rsrp) {
+                if (rsrp >= -80) return { quality: 'excellent', percent: 100 };
+                if (rsrp >= -90) return { quality: 'good', percent: 75 };
+                if (rsrp >= -100) return { quality: 'fair', percent: 50 };
+                return { quality: 'poor', percent: 25 };
+            }
+
+            parseServingCell(response) {
+                if (!response) return;
+                const lines = response.split('\n');
+                for (let line of lines) {
+                    if (line.includes('+QENG:') && line.includes('LTE')) {
+                        let data = line.substring(line.indexOf('"'));
+                        const parts = data.split(',').map(s => s.trim().replace(/"/g, ''));
+
+                        document.getElementById('mode').textContent = (parts[2] + ' ' + parts[3]) || '--';
+
+                        const mcc = parts[4];
+                        const mnc = parts[5];
+                        document.getElementById('operator').textContent = `${mcc}-${mnc}`;
+
+                        document.getElementById('cellId').textContent = parts[6] || '--';
+                        document.getElementById('pci').textContent = parts[7] || '--';
+                        document.getElementById('earfcn').textContent = parts[8] || '--';
+                        document.getElementById('band').textContent = 'Band ' + parts[9] || '--';
+
+                        const ulBw = this.parseBandwidth(parseInt(parts[10]));
+                        const dlBw = this.parseBandwidth(parseInt(parts[11]));
+                        document.getElementById('bandwidth').textContent = `↑${ulBw} / ↓${dlBw} MHz`;
+
+                        const rsrp = parseInt(parts[13]);
+                        const rsrq = parseInt(parts[14]);
+                        const rssi = parseInt(parts[15]);
+                        const sinr = parseInt(parts[16]);
+                        const cqi = parts[17];
+                        const txPower = parts[18];
+
+                        document.getElementById('rsrp').textContent = `${rsrp} dBm`;
+                        document.getElementById('rsrq').textContent = `${rsrq} dB`;
+                        document.getElementById('rssi').textContent = `${rssi} dBm`;
+                        document.getElementById('sinr').textContent = `${sinr} dB`;
+                        document.getElementById('cqi').textContent = cqi || '--';
+
+                        if (txPower && txPower !== '-') {
+                            const txPowerValue = parseInt(txPower);
+                            const txPowerDbm = (txPowerValue / 10).toFixed(1);
+                            document.getElementById('txPower').textContent = `${txPowerDbm} dBm`;
+                        } else {
+                            document.getElementById('txPower').textContent = '--';
+                        }
+
+                        const signal = this.getSignalQuality(rsrp);
+                        const bar = document.getElementById('rsrpBar');
+                        bar.style.width = signal.percent + '%';
+                        bar.className = 'signal-fill ' + signal.quality;
+                        bar.textContent = `${signal.percent}% (${rsrp} dBm)`;
                         break;
                     }
                 }
-
-                log(`< ${response.trim()}`, 'response');
-                return response;
-            } catch (error) {
-                log(`Ошибка: ${error.message}`, 'error');
-                return null;
-            }
-        }
-
-        function parseBandwidth(bw) {
-            const bwMap = {0: '1.4', 1: '3', 2: '5', 3: '10', 4: '15', 5: '20'};
-            return bwMap[bw] || bw;
-        }
-
-        function parseResourceBlocks(rb) {
-            // Convert LTE Resource Blocks to MHz
-            const rbMap = {
-                6: '1.4',
-                15: '3',
-                25: '5',
-                50: '10',
-                75: '15',
-                100: '20'
-            };
-            return rbMap[rb] || rb;
-        }
-
-        function getSignalQuality(rsrp) {
-            if (rsrp >= -80) return { quality: 'excellent', percent: 100 };
-            if (rsrp >= -90) return { quality: 'good', percent: 75 };
-            if (rsrp >= -100) return { quality: 'fair', percent: 50 };
-            return { quality: 'poor', percent: 25 };
-        }
-
-        async function refreshData() {
-            if (!isConnected) return;
-
-            // Get serving cell info
-            const servingCell = await sendATCommand('AT+QENG="servingcell"');
-            if (servingCell) {
-                parseServingCell(servingCell);
             }
 
-            // Get CA info
-            const caInfo = await sendATCommand('AT+QCAINFO');
-            if (caInfo) {
-                parseCAInfo(caInfo);
-            }
+            parseCAInfo(response) {
+                if (!response) return;
+                const lines = response.split('\n');
+                const carriers = [];
 
-            // Get RSRP per antenna
-            const rsrpInfo = await sendATCommand('AT+QRSRP');
-            if (rsrpInfo) {
-                parseRSRP(rsrpInfo);
-            }
-        }
+                for (let line of lines) {
+                    if (line.includes('+QCAINFO:')) {
+                        let data = line.substring(line.indexOf(':') + 1);
+                        const parts = data.split(',').map(s => s.trim().replace(/"/g, ''));
 
-        function parseServingCell(response) {
-            const lines = response.split('\n');
-            for (let line of lines) {
-                if (line.includes('+QENG:') && line.includes('LTE')) {
-                    // Split properly handling the +QENG: prefix
-                    let data = line.substring(line.indexOf('"'));
-                    const parts = data.split(',').map(s => s.trim().replace(/"/g, ''));
-                    
-                    // parts[0] = "servingcell"
-                    // parts[1] = state (NOCONN/CONN) - not displayed
-                    document.getElementById('mode').textContent = (parts[2] + ' ' + parts[3]) || '--'; // LTE FDD
-                    
-                    const mcc = parts[4];
-                    const mnc = parts[5];
-                    document.getElementById('operator').textContent = `${mcc}-${mnc}`;
-                    
-                    document.getElementById('cellId').textContent = parts[6] || '--';
-                    document.getElementById('pci').textContent = parts[7] || '--';
-                    document.getElementById('earfcn').textContent = parts[8] || '--';
-                    document.getElementById('band').textContent = 'Band ' + parts[9] || '--';
-                    
-                    const ulBw = parseBandwidth(parseInt(parts[10]));
-                    const dlBw = parseBandwidth(parseInt(parts[11]));
-                    document.getElementById('bandwidth').textContent = `↑${ulBw} / ↓${dlBw} MHz`;
-                    
-                    // TAC is at parts[12]
-                    const rsrp = parseInt(parts[13]);
-                    const rsrq = parseInt(parts[14]);
-                    const rssi = parseInt(parts[15]);
-                    const sinr = parseInt(parts[16]);
-                    const cqi = parts[17];
-                    const txPower = parts[18];
-                    
-                    document.getElementById('rsrp').textContent = `${rsrp} dBm`;
-                    document.getElementById('rsrq').textContent = `${rsrq} dB`;
-                    document.getElementById('rssi').textContent = `${rssi} dBm`;
-                    document.getElementById('sinr').textContent = `${sinr} dB`;
-                    document.getElementById('cqi').textContent = cqi || '--';
-                    
-                    // TX Power может быть в диапазоне -20 до 230 (0.1dBm единицы)
-                    if (txPower && txPower !== '-') {
-                        const txPowerValue = parseInt(txPower);
-                        // Конвертируем из 0.1dBm в dBm
-                        const txPowerDbm = (txPowerValue / 10).toFixed(1);
-                        document.getElementById('txPower').textContent = `${txPowerDbm} dBm`;
-                    } else {
-                        document.getElementById('txPower').textContent = '--';
+                        const type = parts[0];
+                        const earfcn = parts[1];
+                        const rbValue = parseInt(parts[2]);
+                        const bwMhz = this.parseResourceBlocks(rbValue);
+                        const bw = `${rbValue} RB (${bwMhz} MHz)`;
+                        const band = parts[3];
+                        const cellState = parts[4];
+                        const pci = parts[5];
+                        const rsrp = parts[6];
+                        const rsrq = parts[7];
+                        const rssi = parts[8];
+                        const sinr = parts[9];
+
+                        carriers.push({ type, earfcn, bw, band, cellState, pci, rsrp, rsrq, rssi, sinr });
                     }
-                    
-                    const signal = getSignalQuality(rsrp);
-                    const bar = document.getElementById('rsrpBar');
-                    bar.style.width = signal.percent + '%';
-                    bar.className = 'signal-fill ' + signal.quality;
-                    bar.textContent = `${signal.percent}% (${rsrp} dBm)`;
-                    
-                    break;
+                }
+
+                document.getElementById('caCount').textContent = carriers.length;
+
+                const carrierList = document.getElementById('carrierList');
+                if (carriers.length > 0) {
+                    carrierList.innerHTML = '';
+                    carriers.forEach(c => {
+                        const item = document.createElement('div');
+                        item.className = 'carrier-item' + (c.type === 'PCC' ? ' primary' : '');
+                        const sinrText = c.type === 'PCC' ? ` | SINR: ${c.sinr} dB` : '';
+
+                        item.innerHTML = `
+                            <strong>${c.type}</strong> - ${c.band}<br>
+                            EARFCN: ${c.earfcn} | BW: ${c.bw} | PCI: ${c.pci}<br>
+                            RSRP: ${c.rsrp} dBm | RSRQ: ${c.rsrq} dB${sinrText}
+                        `;
+                        carrierList.appendChild(item);
+                    });
+                } else {
+                    carrierList.innerHTML = '<p style="color: #999; text-align: center;">Нет данных CA</p>';
                 }
             }
-        }
 
-        function parseCAInfo(response) {
-            const lines = response.split('\n');
-            const carriers = [];
-            
-            for (let line of lines) {
-                if (line.includes('+QCAINFO:')) {
-                    // Extract data after +QCAINFO:
-                    let data = line.substring(line.indexOf(':') + 1);
-                    const parts = data.split(',').map(s => s.trim().replace(/"/g, ''));
-                    
-                    const type = parts[0]; // PCC or SCC
-                    const earfcn = parts[1];
-                    // In QCAINFO, bandwidth is in Resource Blocks (RB)
-                    const rbValue = parseInt(parts[2]);
-                    const bwMhz = parseResourceBlocks(rbValue);
-                    const bw = `${rbValue} RB (${bwMhz} MHz)`; // Show both RB and MHz
-                    const band = parts[3];
-                    const cellState = parts[4]; // Cell state (not MIMO!)
-                    const pci = parts[5];
-                    const rsrp = parts[6];
-                    const rsrq = parts[7];
-                    const rssi = parts[8];
-                    const sinr = parts[9];
-                    
-                    carriers.push({ type, earfcn, bw, band, cellState, pci, rsrp, rsrq, rssi, sinr });
-                }
-            }
-            
-            document.getElementById('caCount').textContent = carriers.length;
-            
-            const carrierList = document.getElementById('carrierList');
-            if (carriers.length > 0) {
-                carrierList.innerHTML = '';
-                carriers.forEach(c => {
-                    const item = document.createElement('div');
-                    item.className = 'carrier-item' + (c.type === 'PCC' ? ' primary' : '');
-                    
-                    // Show SINR only for PCC (primary carrier)
-                    const sinrText = c.type === 'PCC' ? ` | SINR: ${c.sinr} dB` : '';
-                    
-                    item.innerHTML = `
-                        <strong>${c.type}</strong> - ${c.band}<br>
-                        EARFCN: ${c.earfcn} | BW: ${c.bw} | PCI: ${c.pci}<br>
-                        RSRP: ${c.rsrp} dBm | RSRQ: ${c.rsrq} dB${sinrText}
-                    `;
-                    carrierList.appendChild(item);
-                });
-            } else {
-                carrierList.innerHTML = '<p style="color: #999; text-align: center;">Нет данных CA</p>';
-            }
-        }
+            parseRSRP(response) {
+                if (!response) return;
+                const lines = response.split('\n');
 
-        function parseRSRP(response) {
-            const lines = response.split('\n');
-            
-            for (let line of lines) {
-                if (line.includes('+QRSRP:')) {
-                    // Format: +QRSRP: <rsrp0>,<rsrp1>,<rsrp2>,<rsrp3>
-                    let data = line.substring(line.indexOf(':') + 1);
-                    const parts = data.split(',').map(s => s.trim());
-                    
-                    // Update antenna RSRP values with color coding
-                    const updateAntenna = (index, rsrpValue) => {
-                        const rsrp = parseInt(rsrpValue);
-                        const valueElement = document.getElementById(`rsrp${index}`);
-                        const containerElement = document.getElementById(`rsrp${index}-value`);
-                        
-                        if (rsrp !== 0) {
-                            valueElement.textContent = rsrp;
-                            // Mark as inactive if <= -140 dBm (antenna not working)
-                            if (rsrp <= -140) {
-                                containerElement.classList.add('inactive');
+                for (let line of lines) {
+                    if (line.includes('+QRSRP:')) {
+                        let data = line.substring(line.indexOf(':') + 1);
+                        const parts = data.split(',').map(s => s.trim());
+
+                        const updateAntenna = (index, rsrpValue) => {
+                            const rsrp = parseInt(rsrpValue);
+                            const valueElement = document.getElementById(`rsrp${index}`);
+                            const containerElement = document.getElementById(`rsrp${index}-value`);
+
+                            if (rsrp !== 0 && !isNaN(rsrp)) {
+                                valueElement.textContent = rsrp;
+                                if (rsrp <= -140) {
+                                    containerElement.classList.add('inactive');
+                                } else {
+                                    containerElement.classList.remove('inactive');
+                                }
                             } else {
+                                valueElement.textContent = '--';
                                 containerElement.classList.remove('inactive');
                             }
-                        } else {
-                            valueElement.textContent = '--';
-                            containerElement.classList.remove('inactive');
-                        }
-                    };
-                    
-                    if (parts[0]) updateAntenna(0, parts[0]);
-                    if (parts[1]) updateAntenna(1, parts[1]);
-                    if (parts[2]) updateAntenna(2, parts[2]);
-                    if (parts[3]) updateAntenna(3, parts[3]);
-                    
-                    break;
+                        };
+
+                        if (parts[0]) updateAntenna(0, parts[0]);
+                        if (parts[1]) updateAntenna(1, parts[1]);
+                        if (parts[2]) updateAntenna(2, parts[2]);
+                        if (parts[3]) updateAntenna(3, parts[3]);
+                        break;
+                    }
                 }
             }
         }
 
-        async function getModemInfo() {
-            if (!isConnected) return;
-            
-            await sendATCommand('ATI');
-            await sendATCommand('AT+QGMR');
-            await sendATCommand('AT+CIMI');
-            await sendATCommand('AT+CNUM');
-        }
-
-        function toggleAutoRefresh() {
-            const enabled = document.getElementById('autoRefresh').checked;
-            const interval = parseInt(document.getElementById('refreshInterval').value);
-            
-            if (enabled && interval > 0) {
-                autoRefreshInterval = setInterval(refreshData, interval);
-                log(`Автообновление включено (${interval/1000} сек)`, 'response');
-            } else {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = null;
-                }
-                log('Автообновление выключено', 'response');
-            }
-        }
-
-        document.getElementById('refreshInterval').addEventListener('change', function() {
-            if (document.getElementById('autoRefresh').checked) {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                }
-                toggleAutoRefresh();
-            }
-        });
-
-        // Check Web Serial API support
-        if (!('serial' in navigator)) {
-            const warning = document.createElement('div');
-            warning.className = 'warning';
-            warning.innerHTML = '❌ Ваш браузер не поддерживает Web Serial API. Используйте Chrome, Edge или Opera версии 89+.';
-            document.querySelector('.container').insertBefore(warning, document.querySelector('.grid'));
-            document.getElementById('connectBtn').disabled = true;
-        }
+        const app = new App();
     </script>
 </body>
+
 </html>
